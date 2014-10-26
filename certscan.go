@@ -74,7 +74,7 @@ func parseargs() (string, []string) {
 	return outfilename, infilenames
 }
 
-type rechandler func([]string) error
+type rechandler func([]string, *csv.Writer) error
 
 //
 //  keeptest -- do we want to keep this record?
@@ -106,13 +106,13 @@ func keeptest(cfields certumich.Rawcert) (bool, error) {
 		if keep && !keepopts.org {
 			subjectparams, err := certumich.Unpackparamfields(cfields.Subject) // unpack Subject field
 			if err != nil {
-				return false, err               // pass error upward
+				return false, err // pass error upward
 			}
 			org, foundorg := subjectparams["O"] // test for presence of org
 			if org == subjectparams["CN"] {     // if org is same as the domain name
-				foundorg = false                // org not meaningful, ignore
+				foundorg = false // org not meaningful, ignore
 			}
-			keep = keep && foundorg             // must have Organization field
+			keep = keep && foundorg // must have Organization field
 		}
 	}
 	return keep, nil // final result
@@ -121,13 +121,19 @@ func keeptest(cfields certumich.Rawcert) (bool, error) {
 //
 //  dorec -- handle an input line record, already parsed into fields
 //
-func dorec(fields []string) error {
+func dorec(fields []string, outf *csv.Writer) error {
 	cfields := certumich.Unpackrawcert(fields) // convert to structure format
 	keep, err := keeptest(cfields)             // keep this record?
 	if err != nil {                            // trouble
 		return err
 	}
-	if verbose || keep {
+	if (outf != nil) && keep { // if output file
+		err := (*outf).Write(fields) // write output
+		if err != nil {
+			panic(err) // fails
+		}
+	}
+	if verbose {
 		util.Dumpstrstruct(cfields) // dump ***TEMP***
 		fmt.Println("")
 	}
@@ -137,7 +143,7 @@ func dorec(fields []string) error {
 //
 //  readinputfile -- handle an input file
 //    
-func readinputfile(infilename string, fn rechandler) (int, error) {
+func readinputfile(infilename string, fn rechandler, outf *csv.Writer) (int, error) {
 	badlinecount := 0              // no bad lines yet
 	fi, err := os.Open(infilename) // open input file
 	if err != nil {
@@ -168,7 +174,7 @@ func readinputfile(infilename string, fn rechandler) (int, error) {
 			} // and skip
 			return badlinecount, err // I/O error
 		}
-		err = fn(fields) // handle this record
+		err = fn(fields, outf) // handle this record
 		if err != nil {
 			panic(err)
 		}
@@ -182,10 +188,21 @@ func readinputfile(infilename string, fn rechandler) (int, error) {
 func main() {
 	outfilename, infilenames := parseargs()
 	println("Outfilename: ", outfilename)
+	var csvwp *csv.Writer = nil // output csv file, if any
+	if len(outfilename) > 0 {   // open output file
+		fo, err := os.Create(outfilename) // create output file
+		if err != nil {
+			panic(err)
+		}
+		defer fo.Close()         // close at exit (after flush)
+		w := bufio.NewWriter(fo) // make a write buffer
+		csvwp = csv.NewWriter(w) // make a CSV writer
+		defer (*csvwp).Flush()   // flush at exit (before close)
+	}
 	//  Process all the input files
 	for i := range infilenames {
 		println("Input file: ", infilenames[i])
-		badlinecount, err := readinputfile(infilenames[i], dorec)
+		badlinecount, err := readinputfile(infilenames[i], dorec, csvwp)
 		if err != nil {
 			panic(err)
 		} // fail

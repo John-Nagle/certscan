@@ -152,8 +152,10 @@ func Unpackaltdomains(cfields Rawcert) ([]string, error) {
 		pair := pairs[i]                          // this pair
 		typevalue := strings.SplitN(pair, ":", 2) // split at first ":" (IPv6 addresses have ":" in them)
 		if len(typevalue) != 2 {                  // should always be 2
-			var empty []string // empty array of strings
-			return empty, errors.New("Unexpected text in alt domain field: '" + subjectaltnames + "'")
+			////var empty []string                    // empty array of strings
+			println("Unexpected text in alt domain field: '" + subjectaltnames + "'")
+			continue                                // ***TEMP***
+			////return empty, errors.New("Unexpected text in alt domain field: '" + subjectaltnames + "'")
 		}
 		typepart := strings.TrimSpace(typevalue[0])
 		domain := strings.TrimSpace(typevalue[1])
@@ -175,7 +177,10 @@ func addparamtomap(d KeyValueMap, field string) error {
 	}
 	keyandvalue := strings.SplitN(field, "=", 2)
 	if (len(keyandvalue) != 2) || (len(keyandvalue[0]) < 1) {
-		return errors.New("Invalid NAME=value syntax in certificate file: " + field)
+	    msg := "Invalid NAME=value syntax in certificate file: " + field
+	    println("ERROR: ", msg)
+	    return nil  // ***TEMP***
+		return errors.New(msg)
 	}
 	d[strings.TrimSpace(keyandvalue[0])] = strings.TrimSpace(keyandvalue[1])
 	return nil
