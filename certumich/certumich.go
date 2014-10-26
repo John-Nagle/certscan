@@ -71,6 +71,13 @@ type Rawcert struct {
 	Revoked_at                       string
 	Reason_revoked                   string
 }
+//
+//  NameValue -- Name/value tuple, for general use
+//
+type NameValue struct {
+    name string                     // name
+    value string                    // value
+    }
 
 //
 //  Unpackrawcert -- unpack into named fields
@@ -132,19 +139,19 @@ func Unpackrawcert(s []string) Rawcert {
 //  Returns domains ("DNS") only.  No emails, etc.
 //
 func Unpackaltdomains(cfields Rawcert) ([]string, error) {
-    subjectaltnames := strings.TrimSpace(cfields.X_509_subjectAltName)         // get subject alt name field
-	if len(subjectaltnames) < 1 || subjectaltnames == "<EMPTY>" { // if none, return empty string
+	subjectaltnames := strings.TrimSpace(cfields.X_509_subjectAltName) // get subject alt name field
+	if len(subjectaltnames) < 1 || subjectaltnames == "<EMPTY>" {      // if none, return empty string
 		var empty []string // empty array of strings
-		return empty, nil   // isn't garbage collection convenient?
+		return empty, nil  // isn't garbage collection convenient?
 	}
 	//  Have data of form "type:value, type:value"
 	pairs := strings.Split(subjectaltnames, ",") // split into tuples
-	domains := make([]string, 0, 10)              // make space for an array of strings
-	for i := range pairs {                  // iterate over pairs
-	    pair := pairs[i]                    // this pair
-		typevalue := strings.SplitN(pair, ":",2) // split at first ":" (IPv6 addresses have ":" in them)
-		if len(typevalue) != 2 {             // should always be 2
-		var empty []string                  // empty array of strings
+	domains := make([]string, 0, 10)             // make space for an array of strings
+	for i := range pairs {                       // iterate over pairs
+		pair := pairs[i]                          // this pair
+		typevalue := strings.SplitN(pair, ":", 2) // split at first ":" (IPv6 addresses have ":" in them)
+		if len(typevalue) != 2 {                  // should always be 2
+			var empty []string // empty array of strings
 			return empty, errors.New("Unexpected text in alt domain field: '" + subjectaltnames + "'")
 		}
 		typepart := strings.TrimSpace(typevalue[0])
@@ -154,4 +161,13 @@ func Unpackaltdomains(cfields Rawcert) ([]string, error) {
 		}
 	}
 	return domains, nil // normal return
+}
+//
+//  Unpackparamfields -- unpack fields of form name=value, name=value...
+//
+//  Unfortunately, the "value" fields may contain commas. So this is a parsing headache.
+//
+func Unpackparamfields(s string) ([]NameValue, error) {
+    var empty []NameValue // empty array of strings
+    return empty, nil                        // ***MORE***
 }
