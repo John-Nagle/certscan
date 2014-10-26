@@ -21,23 +21,25 @@ import "io"
 import "bufio"
 import "certscan/certumich"
 import "certscan/util"
+
 //
 //  keepoptions -- exclude record if lacks any of these properties.
 //
 //  Default is exclude, options override.
 //
 type keepoptions struct {
-    altname bool                        // lacks alt domain names
-    org bool                            // lacks Organization (O) field
-    valid bool                          // not valid cert
-    mozvalid bool                       // not valid cert for Mozilla cert chain
-    casigned bool                       // CA (not self-signed) cert
-    }
+	altname      bool // lacks alt domain names
+	org          bool // lacks Organization (O) field
+	valid        bool // not valid cert
+	browservalid bool // not valid cert for any known browser cert chain
+	casigned     bool // CA (not self-signed) cert
+}
+
 //
 //  Globals
 //
-var verbose bool = false                // true if verbose
-var keepopts keepoptions                // the keep/exclude options
+var verbose bool = false // true if verbose
+var keepopts keepoptions // the keep/exclude options
 
 //
 //  parseargs -- parse input args
@@ -47,12 +49,12 @@ var keepopts keepoptions                // the keep/exclude options
 //  Returns outfilename, []infilenames
 //
 func parseargs() (string, []string) {
-    //  Command line options
+	//  Command line options
 	flag.BoolVar(&verbose, "v", false, "Verbose mode")
 	flag.BoolVar(&keepopts.altname, "noaltname", false, "Keep record if no Alt Names")
 	flag.BoolVar(&keepopts.org, "noorg", false, "Keep record if no Organization")
 	flag.BoolVar(&keepopts.valid, "novalid", false, "Keep record if not valid cert")
-	flag.BoolVar(&keepopts.mozvalid, "nomozvalid", false, "Keep record if not valid per Mozilla root cert list")
+	flag.BoolVar(&keepopts.browservalid, "nobrowservalid", false, "Keep record if not valid per Mozilla root cert list")
 	flag.BoolVar(&keepopts.casigned, "nocasigned", false, "Keep record if not CA-signed (self-signed cert)")
 	var outfilename string
 	infilenames := make([]string, 0)
@@ -77,42 +79,53 @@ type rechandler func([]string) error
 //
 //  keeptest -- do we want to keep this record?
 //
-func keeptest(cfields certumich.Rawcert)(bool, error) {
-    keep := true                                                 // assume keep
-    //  Alt names check  
-    if !keepopts.altname {                                      // if requiring alt names
-    	altnames := cfields.X_509_subjectAltName                // alt names
-	    if len(altnames) == 0 {
-	        keep = false
-	    } else {
-		    domains, err := certumich.Unpackaltdomains(cfields) // unpack alt names into domains
-		    if err != nil { 
-		        return false, err                               // pass error upward
-		    }
-		    if len(domains) == 0 { 
-		        keep = false
-		    }
+func keeptest(cfields certumich.Rawcert) (bool, error) {
+	keep := true // assume keep
+	//  Alt names check  
+	if !keepopts.altname { // if requiring alt names
+		altnames := cfields.X_509_subjectAltName // alt names
+		if len(altnames) == 0 {
+			keep = false
+		} else {
+			domains, err := certumich.Unpackaltdomains(cfields) // unpack alt names into domains
+			if err != nil {
+				return false, err // pass error upward
+			}
+			if len(domains) == 0 {
+				keep = false
+			}
 		}
-    //  Valid flags check
-    keep = keep && (keepopts.valid || strings.HasPrefix("t",cfields.Is_valid))                // discard if not valid
-    keep = keep && (keepopts.mozvalid || strings.HasPrefix("t",cfields.Is_mozilla_valid))     // discard if not Mozilla valid
-    keep = keep && (keepopts.casigned || !strings.HasPrefix("t",cfields.Is_self_signed))      // discard if self-signed
-    //  Has Organization field check
-    if !keepopts.org {
-        //  ***MORE***
-    }
-    }
-    return keep, nil                                            // final result
+		//  Valid flags check
+		keep = keep && (keepopts.valid || strings.HasPrefix("t", cfields.Is_valid)) // discard if not valid
+		keep = keep && (keepopts.browservalid ||
+			strings.HasPrefix("t", cfields.Is_mozilla_valid) ||
+			strings.HasPrefix("t", cfields.Is_windows_valid) ||
+			strings.HasPrefix("t", cfields.Is_apple_valid)) // discard if not big-name browser valid
+		keep = keep && (keepopts.casigned || !strings.HasPrefix("t", cfields.Is_self_signed)) // discard if self-signed
+		//  Has Organization field check
+		if keep && !keepopts.org {
+			subjectparams, err := certumich.Unpackparamfields(cfields.Subject) // unpack Subject field
+			if err != nil {
+				return false, err               // pass error upward
+			}
+			org, foundorg := subjectparams["O"] // test for presence of org
+			if org == subjectparams["CN"] {     // if org is same as the domain name
+				foundorg = false                // org not meaningful, ignore
+			}
+			keep = keep && foundorg             // must have Organization field
+		}
+	}
+	return keep, nil // final result
 }
 
 //
 //  dorec -- handle an input line record, already parsed into fields
 //
 func dorec(fields []string) error {
-	cfields := certumich.Unpackrawcert(fields)                  // convert to structure format
-	keep, err := keeptest(cfields)                              // keep this record?
-	if err != nil {                                             // trouble
-	    return err
+	cfields := certumich.Unpackrawcert(fields) // convert to structure format
+	keep, err := keeptest(cfields)             // keep this record?
+	if err != nil {                            // trouble
+		return err
 	}
 	if verbose || keep {
 		util.Dumpstrstruct(cfields) // dump ***TEMP***
@@ -175,7 +188,7 @@ func main() {
 		badlinecount, err := readinputfile(infilenames[i], dorec)
 		if err != nil {
 			panic(err)
-		}                                                 // fail
+		} // fail
 		println(badlinecount, " bad lines in this file.") // report problems
 	}
 }

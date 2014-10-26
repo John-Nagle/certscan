@@ -4,7 +4,7 @@
 //  Operates on U_ Mich_ certificate dump CSV files_
 //
 //  The data files used are from
-//  https://scans_io/study/umich-https
+//  https://scans.io/study/umich-https
 //
 //  John Nagle
 //  SiteTruth
@@ -71,13 +71,14 @@ type Rawcert struct {
 	Revoked_at                       string
 	Reason_revoked                   string
 }
+
 //
 //  NameValue -- Name/value tuple, for general use
 //
 type NameValue struct {
-    name string                     // name
-    value string                    // value
-    }
+	Name  string // name
+	Value string // value
+}
 
 //
 //  Unpackrawcert -- unpack into named fields
@@ -162,12 +163,45 @@ func Unpackaltdomains(cfields Rawcert) ([]string, error) {
 	}
 	return domains, nil // normal return
 }
+
+type KeyValueMap map[string]string // a key/value map
+//  
+//  addparamtomap - break "X=Y" form into name, value and add to map.
+//
+func addparamtomap(d KeyValueMap, field string) error {
+	field = strings.TrimSpace(field) // clean up string
+	if len(field) < 1 {              // ignore empty fields
+		return nil
+	}
+	keyandvalue := strings.SplitN(field, "=", 2)
+	if (len(keyandvalue) != 2) || (len(keyandvalue[0]) < 1) {
+		return errors.New("Invalid NAME=value syntax in certificate file: " + field)
+	}
+	d[strings.TrimSpace(keyandvalue[0])] = strings.TrimSpace(keyandvalue[1])
+	return nil
+}
+
 //
 //  Unpackparamfields -- unpack fields of form name=value, name=value...
 //
 //  Unfortunately, the "value" fields may contain commas. So this is a parsing headache.
 //
-func Unpackparamfields(s string) ([]NameValue, error) {
-    var empty []NameValue // empty array of strings
-    return empty, nil                        // ***MORE***
+func Unpackparamfields(s string) (KeyValueMap, error) {
+	////println("Param fields: ",s)                     // ***TEMP***
+	d := make(KeyValueMap, 10)      // returned key/value pairs.
+	fields := strings.Split(s, ",") // split at comma
+	var workfield string = ""       // last field if left over
+	for i := range fields {
+		if strings.ContainsRune(fields[i], '=') { // if it has an "="
+			err := addparamtomap(d, workfield) // do previous field
+			if err != nil {
+				return d, err
+			}
+			workfield = fields[i] // new work field
+		} else { // is part of previous expression
+			workfield = workfield + "," + fields[i]
+		}
+	}
+	err := addparamtomap(d, workfield)
+	return d, err
 }
