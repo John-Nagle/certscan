@@ -36,10 +36,20 @@ type keepoptions struct {
 }
 
 //
+//  Tallies
+//
+type tallies struct {
+	in     int64 // records in
+	out    int64 // records out
+	errors int64 // errors
+}
+
+//
 //  Globals
 //
 var verbose bool = false // true if verbose
 var keepopts keepoptions // the keep/exclude options
+var tally tallies        // error counts
 
 //
 //  parseargs -- parse input args
@@ -81,8 +91,21 @@ type rechandler func([]string, *csv.Writer) error
 //
 func keeptest(cfields certumich.Rawcert) (bool, error) {
 	keep := true // assume keep
+	//  Valid flags check
+	keep = keep && (keepopts.valid || strings.HasPrefix("t", cfields.Is_valid)) // discard if not valid
+	keep = keep && (keepopts.browservalid ||
+		strings.HasPrefix("t", cfields.Is_mozilla_valid) ||
+		strings.HasPrefix("t", cfields.Is_windows_valid) ||
+		strings.HasPrefix("t", cfields.Is_apple_valid)) // discard if not big-name browser valid
+	keep = keep && (keepopts.casigned || !strings.HasPrefix("t", cfields.Is_self_signed)) // discard if self-signed
+	//  Unpack subject info
+	subjectparams, err := certumich.Unpackparamfields(cfields.Subject) // unpack Subject field
+	if err != nil {
+		return false, err // pass error upward
+	}
+	domain := subjectparams["CN"] // Common Name, i.e. main domain
 	//  Alt names check  
-	if !keepopts.altname { // if requiring alt names
+	if keep && !keepopts.altname { // if requiring alt names
 		altnames := cfields.X_509_subjectAltName // alt names
 		if len(altnames) == 0 {
 			keep = false
@@ -91,29 +114,26 @@ func keeptest(cfields certumich.Rawcert) (bool, error) {
 			if err != nil {
 				return false, err // pass error upward
 			}
-			if len(domains) == 0 {
+			if len(domains) == 0 { // have domains
 				keep = false
+			} else { // check if subdomains of main name
+				keep = false
+				for i := range domains { // for all domains
+					if !(util.Issubdomain(domains[i], domain) || util.Issubdomain(domain, domains[i])) { // if non-subdomain, cert needs to be kept
+						keep = true // must keep
+						break
+					}
+				}
 			}
 		}
-		//  Valid flags check
-		keep = keep && (keepopts.valid || strings.HasPrefix("t", cfields.Is_valid)) // discard if not valid
-		keep = keep && (keepopts.browservalid ||
-			strings.HasPrefix("t", cfields.Is_mozilla_valid) ||
-			strings.HasPrefix("t", cfields.Is_windows_valid) ||
-			strings.HasPrefix("t", cfields.Is_apple_valid)) // discard if not big-name browser valid
-		keep = keep && (keepopts.casigned || !strings.HasPrefix("t", cfields.Is_self_signed)) // discard if self-signed
-		//  Has Organization field check
-		if keep && !keepopts.org {
-			subjectparams, err := certumich.Unpackparamfields(cfields.Subject) // unpack Subject field
-			if err != nil {
-				return false, err // pass error upward
-			}
-			org, foundorg := subjectparams["O"] // test for presence of org
-			if org == subjectparams["CN"] {     // if org is same as the domain name
-				foundorg = false // org not meaningful, ignore
-			}
-			keep = keep && foundorg // must have Organization field
+	}
+	//  Has Organization field check
+	if keep && !keepopts.org {
+		org, foundorg := subjectparams["O"] // test for presence of org
+		if org == subjectparams["CN"] {     // if org is same as the domain name
+			foundorg = false // org not meaningful, ignore
 		}
+		keep = keep && foundorg // must have Organization field
 	}
 	return keep, nil // final result
 }
@@ -122,13 +142,18 @@ func keeptest(cfields certumich.Rawcert) (bool, error) {
 //  dorec -- handle an input line record, already parsed into fields
 //
 func dorec(fields []string, outf *csv.Writer) error {
+	tally.in++                                 // count in
 	cfields := certumich.Unpackrawcert(fields) // convert to structure format
 	keep, err := keeptest(cfields)             // keep this record?
 	if err != nil {                            // trouble
-		return err
+		msg := "INVALID RECORD FORMAT: " + err.Error() // create message
+		certumich.Seterror(fields, msg)                // set in record for later use
+		tally.errors++                                 // count errors
+		keep = true                                    // force keep
 	}
 	if (outf != nil) && keep { // if output file
 		err := (*outf).Write(fields) // write output
+		tally.out++                  // count out
 		if err != nil {
 			panic(err) // fails
 		}
@@ -147,7 +172,7 @@ func readinputfile(infilename string, fn rechandler, outf *csv.Writer) (int, err
 	badlinecount := 0              // no bad lines yet
 	fi, err := os.Open(infilename) // open input file
 	if err != nil {
-		panic(err) // ***TEMP***
+		panic(err) // Unable to open input, panicking
 	}
 	defer func() { // handle close
 		if err := fi.Close(); err != nil {
@@ -166,7 +191,7 @@ func readinputfile(infilename string, fn rechandler, outf *csv.Writer) (int, err
 			if err == io.EOF { // normal EOF
 				return badlinecount, nil
 			}
-			println("Rejected line: ", err.Error()) // trouble
+			fmt.Println("Rejected CSV line: ", err.Error()) // trouble
 			//  ***NEED TO CHECK FOR I/O error here***
 			badlinecount++          // tally
 			if badlinecount < 100 { // stop after 100 errors, for now
@@ -183,13 +208,24 @@ func readinputfile(infilename string, fn rechandler, outf *csv.Writer) (int, err
 }
 
 //
+//  printstats-- print final statistics
+//
+func printstats(t tallies) {
+	fmt.Printf("Record counts:\n In:  %12d\n Out: %12d\n Err: %12d\n", t.in, t.out, t.errors)
+	if t.in > 0 {
+		pct := (float64(t.out) * 100) / float64(t.in)
+		fmt.Printf(" %1.2f%% kept.\n", pct) // percent kept
+	}
+}
+
+//
 //  Main program
 //
 func main() {
 	outfilename, infilenames := parseargs()
-	println("Outfilename: ", outfilename)
 	var csvwp *csv.Writer = nil // output csv file, if any
 	if len(outfilename) > 0 {   // open output file
+		println("Output file: ", outfilename)
 		fo, err := os.Create(outfilename) // create output file
 		if err != nil {
 			panic(err)
@@ -206,6 +242,10 @@ func main() {
 		if err != nil {
 			panic(err)
 		} // fail
-		println(badlinecount, " bad lines in this file.") // report problems
+		if badlinecount > 0 {
+			fmt.Println(badlinecount, "bad CSV lines in this file.") // report problems
+		}
 	}
+	//  Final statistics
+	printstats(tally)
 }

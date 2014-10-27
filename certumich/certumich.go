@@ -152,10 +152,8 @@ func Unpackaltdomains(cfields Rawcert) ([]string, error) {
 		pair := pairs[i]                          // this pair
 		typevalue := strings.SplitN(pair, ":", 2) // split at first ":" (IPv6 addresses have ":" in them)
 		if len(typevalue) != 2 {                  // should always be 2
-			////var empty []string                    // empty array of strings
-			println("Unexpected text in alt domain field: '" + subjectaltnames + "'")
-			continue                                // ***TEMP***
-			////return empty, errors.New("Unexpected text in alt domain field: '" + subjectaltnames + "'")
+			var empty []string // empty array of strings
+			return empty, errors.New("Unexpected text in alt domain field: '" + subjectaltnames + "'")
 		}
 		typepart := strings.TrimSpace(typevalue[0])
 		domain := strings.TrimSpace(typevalue[1])
@@ -177,9 +175,7 @@ func addparamtomap(d KeyValueMap, field string) error {
 	}
 	keyandvalue := strings.SplitN(field, "=", 2)
 	if (len(keyandvalue) != 2) || (len(keyandvalue[0]) < 1) {
-	    msg := "Invalid NAME=value syntax in certificate file: " + field
-	    println("ERROR: ", msg)
-	    return nil  // ***TEMP***
+		msg := "Invalid NAME=value syntax in certificate file: " + field
 		return errors.New(msg)
 	}
 	d[strings.TrimSpace(keyandvalue[0])] = strings.TrimSpace(keyandvalue[1])
@@ -209,4 +205,16 @@ func Unpackparamfields(s string) (KeyValueMap, error) {
 	}
 	err := addparamtomap(d, workfield)
 	return d, err
+}
+
+//
+//  Seterror -- set an error message into the array of fields for later use
+//
+//  Put in the field OpenSSL_validation_error
+//
+func Seterror(fields []string, msg string) {
+	const ERRFIELD = 12 // goes into field 12
+	if len(strings.TrimSpace(fields[ERRFIELD])) == 0 {
+		fields[ERRFIELD] = "***ERROR*** " + msg // put msg in record if no other error
+	}
 }
