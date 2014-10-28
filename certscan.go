@@ -219,13 +219,25 @@ func printstats(t tallies) {
 }
 
 //
+//  init -- misc. initialization
+//
+func init() {
+	const domainsuffixfile = "/home/john/projects/gocode/src/certscan/data/effective_tld_names.dat" // should be overrideable
+	domainsuffixes, err := util.Loadpublicsuffixlist(domainsuffixfile)                              // load list
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("%d domain suffixes.\n", len(domainsuffixes))
+}
+
+//
 //  Main program
 //
 func main() {
 	outfilename, infilenames := parseargs()
 	var csvwp *csv.Writer = nil // output csv file, if any
 	if len(outfilename) > 0 {   // open output file
-		println("Output file: ", outfilename)
+		fmt.Println("Output file: ", outfilename)
 		fo, err := os.Create(outfilename) // create output file
 		if err != nil {
 			panic(err)
