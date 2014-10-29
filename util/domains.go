@@ -8,6 +8,7 @@
 //
 package util
 
+import "fmt"
 import "strings"
 import "os"
 import "io"
@@ -33,19 +34,79 @@ func Issubdomain(a string, b string) bool {
 }
 
 //
+//  DomainSuffixes -- public domain name suffixes and lookup utilities for them
+//
+type DomainSuffixes struct {
+	loaded           bool            // true if suffixes loaded
+	reversedsuffixes map[string]bool // suffixes, reversed. Set.
+}
+
+//
+//  Reversedomain  -- turn a.b.c into c.b.a
+//
+func Reversedomain(s string) string {
+	parts := strings.Split(s, ".") // split into parts
+	nparts := len(parts)            // in-place reverse        
+	for i := 0; i < nparts/2; i++ {
+		tmp := parts[nparts-i-1] // swap
+		parts[nparts-i-1] = parts[i]
+		parts[i] = tmp
+	}
+	return strings.Join(parts, ".") // return as string       
+}
+//
+//  Samesecondleveldomain -- true if two domains have the same second level domain
+//
+func (d* DomainSuffixes) Samesecondleveldomain(a string, b string) (bool, bool) {
+    _, a2nd, atld, aok := d.Domainparts(a)                   // break apart domain
+    _, b2nd, btld, bok := d.Domainparts(b)
+    return (atld == btld) && (a2nd == b2nd), aok && bok         // return true if matched
+}
+//
+//  Domainparts  -- break up domain name into public TLD, 2nd level domain, and local subdomain
+//
+//  "sub.example.com" is broken into local subdomain "sub", 2nd level domain "example", and TLD "com"
+//
+//  The list of public TLDs is used for this purpose.
+//
+func (d *DomainSuffixes) Domainparts(s string) (string, string, string, bool) {
+	if !d.loaded {
+		panic("DomainSuffixes not loaded")
+	}
+	parts := strings.Split(s, ".") // domain parts
+	for i := 0; i < len(parts); i++ {   // finding longest TLD that matches
+	    tld := strings.Join(parts[i:],".")              // candidate TLD
+		if d.reversedsuffixes[Reversedomain(tld)] { // if matched TLD
+		    switch {	    
+		    case  i == 0 :
+		        return "","",tld, false                 // this is a TLD - it has no 2nd
+		    case  i == 1:
+		        return "",parts[0], tld, true           // second level domain
+		    default: 
+			    return strings.Join(parts[0 : i-1],"."), parts[i-1], tld, true // sub, 2nd, tld, OK
+			}
+		}
+	}
+	return "", "", "", false // no TLD match
+}
+
+//
 //  Loadpublicsuffixlist  -- load list of public domain suffixes
 //
 //  This comes from "https://publicsuffix.org/list/effective_tld_names.dat"
 //
-func Loadpublicsuffixlist(infile string) ([]string, error) {
+func (d *DomainSuffixes) Loadpublicsuffixlist(infile string) error {
 	const icannstart = "===BEGIN ICANN DOMAINS==="
 	const icannend = "===END ICANN DOMAINS==="
+	if d.loaded {
+		panic("DomainSuffixes already loaded")
+	}
+	d.reversedsuffixes = make(map[string]bool)   // create empty map
 	redelim := regexp.MustCompile(`===.+===`) // get section delimiter, of form "===DELIM==="
-	suffixes := make([]string, 100)           // rough size of list today
 	//  Read the file
 	fi, err := os.Open(infile) // open file of public domain suffixes
 	if err != nil {
-		return suffixes, err // Unable to open input, fail
+		return err // Unable to open input, fail
 	}
 	defer func() { // handle close
 		if err := fi.Close(); err != nil {
@@ -60,13 +121,13 @@ func Loadpublicsuffixlist(infile string) ([]string, error) {
 			if err == io.EOF { // if EOF
 				break // done
 			}
-			return suffixes, err // I/O error
+			return err // I/O error
 		}
 		s = strings.TrimSpace(s) // clean line
 		if len(s) == 0 {         // ignore blank lines
 			continue
 		}
-		if strings.HasPrefix(s, "//") { // search for delim
+		if strings.HasPrefix(s, "//") { // if comment, which includes section delim
 			found := redelim.Find([]byte(s)) // matches "===ANYTHING==="
 			if len(found) > 0 {              // if found something
 				delim := string(found[:]) // delimiter as string
@@ -82,13 +143,27 @@ func Loadpublicsuffixlist(infile string) ([]string, error) {
 		} else { // non-comment
 			if inicann { // save ICANN names only
 				//  ***SHOULD VALIDATE DOMAIN SYNTAX HERE***
-				suffixes = append(suffixes, s) // add to domain suffixes
+				d.reversedsuffixes[Reversedomain(s)] = true // add to domain suffixes
 			}
 		}
 	}
 	// finish up
-	if len(suffixes) < 1 { // did not find any domains
-		return suffixes, errors.New("No domain suffixes in suffix file: " + infile) // must be bogus file
+	if len(d.reversedsuffixes) < 1 { // did not find any domains
+		return errors.New("No domain suffixes in suffix file: " + infile) // must be bogus file
 	}
-	return suffixes, nil // normal return
+	d.loaded = true // now loaded
+	return nil      // normal return
+}
+
+//
+//  Dump -- dump state of this object for debug
+//
+func (d *DomainSuffixes) Dump() {
+	fmt.Printf("Domain suffixes. Loaded=%t.\n", d.loaded) // dump to standard output
+	if d.loaded {
+	    fmt.Printf(" %d domain suffixes:\n", len(d.reversedsuffixes))
+	    for key, _ := range d.reversedsuffixes {
+		    fmt.Printf("  '%s'\n", key) 
+		}
+	}
 }
