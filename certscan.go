@@ -51,6 +51,7 @@ var verbose bool = false        // true if verbose
 var keepopts keepoptions        // the keep/exclude options
 var tally tallies               // error counts
 var TLDinfo util.DomainSuffixes // top-level domain info
+var CAinfo util.CApolicyinfo    // policy info
 
 //
 //  parseargs -- parse input args
@@ -116,28 +117,28 @@ func keeptest(cfields certumich.Rawcert) (bool, error) {
 				return false, err // pass error upward
 			}
 			if domain != "" {
-			    domains = append(domains, domain)               // add common name to domains
-			    }
+				domains = append(domains, domain) // add common name to domains
+			}
 			if len(domains) == 0 { // have domains
 				keep = false
 			} else { // check if subdomains of main name		
 				keep = false
-				dtld := ""                                       // no top-level domain yet
-				d2nd := ""                                       // no second-level domain yet
+				dtld := ""               // no top-level domain yet
+				d2nd := ""               // no second-level domain yet
 				for i := range domains { // for all domains
-				    _, a2nd, atld, aok := TLDinfo.Domainparts(domains[i])                   // break apart domain
-				    if !aok {                                    // skip any non-domain junk
-				        continue
-				    }
-				    if dtld == "" {                             // if first TLD found
-				        dtld = atld
-				        d2nd = a2nd
-				    } else {
-				        if (atld != dtld) || (a2nd != d2nd) {   // if different tld or 2ld
-				            fmt.Printf("Multiple-domain cert: '%s.%s' vs '%s.%s'\n", a2nd, atld, d2nd, dtld)  // ***TEMP***
-				            keep = true
-				            break
-				            }
+					_, a2nd, atld, aok := TLDinfo.Domainparts(domains[i]) // break apart domain
+					if !aok {                                             // skip any non-domain junk
+						continue
+					}
+					if dtld == "" { // if first TLD found
+						dtld = atld
+						d2nd = a2nd
+					} else {
+						if (atld != dtld) || (a2nd != d2nd) { // if different tld or 2ld
+							fmt.Printf("Multiple-domain cert: '%s.%s' vs '%s.%s'\n", a2nd, atld, d2nd, dtld) // ***TEMP***
+							keep = true
+							break
+						}
 					}
 				}
 			}
@@ -175,14 +176,14 @@ func dorec(fields []string, outf *csv.Writer) error {
 		}
 	}
 	if verbose {
-	    subjectparams, err := certumich.Unpackparamfields(cfields.Subject) // unpack Subject field
-	    if err != nil {
-	        fmt.Printf("Subject field syntax incorrect: %s\n",cfields.Subject)
-	    } else {
-	        cn := subjectparams["CN"]
-	        cnsub, cn2nd, cntld, cnok := TLDinfo.Domainparts(cn) 
-	        fmt.Printf("CN: '%s'  TLD: '%s'  2LD: '%s'  Subdomain: '%s'  (Valid TLD: %t)\n", cn, cntld, cn2nd, cnsub, cnok)
-	    }             
+		subjectparams, err := certumich.Unpackparamfields(cfields.Subject) // unpack Subject field
+		if err != nil {
+			fmt.Printf("Subject field syntax incorrect: %s\n", cfields.Subject)
+		} else {
+			cn := subjectparams["CN"]
+			cnsub, cn2nd, cntld, cnok := TLDinfo.Domainparts(cn)
+			fmt.Printf("CN: '%s'  TLD: '%s'  2LD: '%s'  Subdomain: '%s'  (Valid TLD: %t)\n", cn, cntld, cn2nd, cnsub, cnok)
+		}
 		util.Dumpstrstruct(cfields) // dump ***TEMP***
 		fmt.Printf("\n")
 	}
@@ -247,11 +248,18 @@ func printstats(t tallies) {
 //
 func init() {
 	const domainsuffixfile = "/home/john/projects/gocode/src/certscan/data/effective_tld_names.dat" // should be overrideable
-	err := TLDinfo.Loadpublicsuffixlist(domainsuffixfile)                              // load list
+	const caoidfile = "/home/john/projects/gocode/src/certscan/data/catypetable.csv"                // should be overrideable
+	err := TLDinfo.Loadpublicsuffixlist(domainsuffixfile)                                           // load list
 	if err != nil {
 		panic(err)
 	}
+	err = CAinfo.Loadoidinfo(caoidfile) // load list
+	if err != nil {
+		panic(err)
+	}
+
 	////TLDinfo.Dump()                                                                      // ***TEMP***
+	CAinfo.Dump()
 }
 
 //
