@@ -15,6 +15,7 @@ import "io"
 import "bufio"
 import "fmt"
 import "strings"
+import "errors"
 import "regexp"
 import "encoding/csv"
 
@@ -30,7 +31,7 @@ type Policyinfo struct {
 //  CApolicyinfo -- collect info about CAs
 // 
 type CApolicyinfo struct {
-	PolicyOID map[string]Policyinfo // policy lookup
+	policyOID map[string]Policyinfo // policy lookup
 }
 
 //
@@ -58,7 +59,7 @@ func (c *CApolicyinfo) addoids(caname string, policytype string, oids []string) 
 		var pol Policyinfo
 		pol.Policy = policytype
 		pol.CAname = caname
-		c.PolicyOID[oids[i]] = pol
+		c.policyOID[oids[i]] = pol
 	}
 }
 
@@ -100,7 +101,7 @@ func (c *CApolicyinfo) Loadoidinfo(infilename string) error {
 	//  Set any CSV format parameters here if necessary.
 	csvr.TrailingComma = true // allow trailing comma (deprecated)
 	//  Create map for results.  Only save map if success.
-	c.PolicyOID = make(map[string]Policyinfo) // working info
+	c.policyOID = make(map[string]Policyinfo) // working info
 	//  Read the file
 	for { // until EOF
 		fields, err := csvr.Read() // read one record
@@ -108,25 +109,39 @@ func (c *CApolicyinfo) Loadoidinfo(infilename string) error {
 			if err == io.EOF {
 				break
 			} else {
-				c.PolicyOID = nil
+				c.policyOID = nil
 				return err
 			}
 		}
 		c.loadline(fields) // load one line from file
 	}
+	if len(c.policyOID) < 1 { // did not find any domains
+	    c.policyOID = nil    // no map
+		return errors.New("No CA policy OIDs found in OID file: " + infilename) // must be bogus file
+	}
 	return nil // normal return
 }
 
+//
+//  getpolicy -- get a policy given an OID
+//
+func (c *CApolicyinfo) getpolicy(oid string) (Policyinfo, bool) {
+    if c.policyOID == nil {
+    panic("cainfo/getpolicy called without policies loaded.")
+    }
+    v, ok :=  c.policyOID[oid]      // value, true if success
+    return v, ok
+}
 //
 //  Dump -- dump for debug
 //
 func (c *CApolicyinfo) Dump() {
 	fmt.Println("CA Policy info:")
-	if c.PolicyOID == nil {
+	if c.policyOID == nil {
 		fmt.Println("  Not loaded.")
 		return
 	}
-	for k, v := range c.PolicyOID { // read out map
+	for k, v := range c.policyOID { // read out map
 		fmt.Printf("  Policy: %s.  OID: '%s'  CA name: %s\n", v.Policy, k, v.CAname)
 	}
 	fmt.Println("")

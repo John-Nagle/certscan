@@ -37,7 +37,6 @@ func Issubdomain(a string, b string) bool {
 //  DomainSuffixes -- public domain name suffixes and lookup utilities for them
 //
 type DomainSuffixes struct {
-	loaded           bool            // true if suffixes loaded
 	reversedsuffixes map[string]bool // suffixes, reversed. Set.
 }
 
@@ -70,7 +69,7 @@ func (d* DomainSuffixes) Samesecondleveldomain(a string, b string) (bool, bool) 
 //  The list of public TLDs is used for this purpose.
 //
 func (d *DomainSuffixes) Domainparts(s string) (string, string, string, bool) {
-	if !d.loaded {
+	if d.reversedsuffixes == nil {
 		panic("DomainSuffixes not loaded")
 	}
 	parts := strings.Split(s, ".") // domain parts
@@ -98,10 +97,6 @@ func (d *DomainSuffixes) Domainparts(s string) (string, string, string, bool) {
 func (d *DomainSuffixes) Loadpublicsuffixlist(infile string) error {
 	const icannstart = "===BEGIN ICANN DOMAINS==="
 	const icannend = "===END ICANN DOMAINS==="
-	if d.loaded {
-		panic("DomainSuffixes already loaded")
-	}
-	d.reversedsuffixes = make(map[string]bool)   // create empty map
 	redelim := regexp.MustCompile(`===.+===`) // get section delimiter, of form "===DELIM==="
 	//  Read the file
 	fi, err := os.Open(infile) // open file of public domain suffixes
@@ -113,6 +108,7 @@ func (d *DomainSuffixes) Loadpublicsuffixlist(infile string) error {
 			panic(err) // failed close is legit panic
 		}
 	}()
+    d.reversedsuffixes = make(map[string]bool)   // suffix set - value always true
 	r := bufio.NewReader(fi) // make a read buffer
 	inicann := false         // not in ICANN block yet
 	for {                    // until EOF
@@ -149,9 +145,9 @@ func (d *DomainSuffixes) Loadpublicsuffixlist(infile string) error {
 	}
 	// finish up
 	if len(d.reversedsuffixes) < 1 { // did not find any domains
+	    d.reversedsuffixes = nil    // no map
 		return errors.New("No domain suffixes in suffix file: " + infile) // must be bogus file
 	}
-	d.loaded = true // now loaded
 	return nil      // normal return
 }
 
@@ -159,8 +155,8 @@ func (d *DomainSuffixes) Loadpublicsuffixlist(infile string) error {
 //  Dump -- dump state of this object for debug
 //
 func (d *DomainSuffixes) Dump() {
-	fmt.Printf("Domain suffixes. Loaded=%t.\n", d.loaded) // dump to standard output
-	if d.loaded {
+	fmt.Printf("Domain suffixes. Loaded=%t.\n", d.reversedsuffixes != nil) // dump to standard output
+	if d.reversedsuffixes != nil {
 	    fmt.Printf(" %d domain suffixes:\n", len(d.reversedsuffixes))
 	    for key, _ := range d.reversedsuffixes {
 		    fmt.Printf("  '%s'\n", key) 
