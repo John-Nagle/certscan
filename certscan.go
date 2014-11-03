@@ -33,6 +33,7 @@ type keepoptions struct {
 	valid        bool // not valid cert
 	browservalid bool // not valid cert for any known browser cert chain
 	casigned     bool // CA (not self-signed) cert
+	policy      string // Keep record only if policy matches ('DV', 'OV', 'EV', or an OID value)
 }
 
 //
@@ -68,6 +69,7 @@ func parseargs() (string, []string) {
 	flag.BoolVar(&keepopts.valid, "novalid", false, "Keep record if not valid cert")
 	flag.BoolVar(&keepopts.browservalid, "nobrowservalid", false, "Keep record if not valid per Mozilla root cert list")
 	flag.BoolVar(&keepopts.casigned, "nocasigned", false, "Keep record if not CA-signed (self-signed cert)")
+	flag.StringVar(&keepopts.policy,"policy", "", "Keep record if policy matches ('DV', 'OV', 'EV', or an OID value)")
 	var outfilename string
 	infilenames := make([]string, 0)
 	flag.StringVar(&outfilename, "o", "", "Output file (csv format)")
@@ -106,13 +108,33 @@ func keeptest(cfields certumich.Rawcert) (bool, error) {
 		return false, err // pass error upward
 	}
 	domain := subjectparams["CN"] // Common Name, i.e. main domain
+	//
+	//  CA Policy check
+	//
+	if keep && keepopts.policy != "" {
+	    policyfields := strings.Fields(cfields.X_509_certificatePolicies) // contains policy OIDS, plus other messages
+		////fmt.Printf("'%s' policies:", domain)
+		find := false
+		for i := range(policyfields) {                      // for all fields
+		    field := policyfields[i]             
+		    if util.IsOID(field) {                          // if it looks like an OID
+		        keep = keep || keepopts.policy == field              // if it matches an actual policy OID
+		        policyitem, ok := CAinfo.Getpolicy(field)   // look up policy item
+		        if ok {
+		            fmt.Printf("Domain '%s' OID %s (%s) from CA %s\n", domain, field, policyitem.Policy, policyitem.CAname) // ***TEMP***
+		            find = find || policyitem.Policy == keepopts.policy // keep if policy matches policy param
+		        }
+		    }
+	    }
+	    keep = keep && find                                 // don't keep unless find
+	}
 	//  Alt names check  
 	if keep && !keepopts.altname { // if requiring alt names
 		altnames := cfields.X_509_subjectAltName // alt names
 		if len(altnames) == 0 {
 			keep = false
 		} else {
-			domains, err := certumich.Unpackaltdomains(cfields) // unpack alt names into domains
+			domains, err := cfields.Unpackaltdomains() // unpack alt names into domains
 			if err != nil {
 				return false, err // pass error upward
 			}
@@ -249,17 +271,14 @@ func printstats(t tallies) {
 func init() {
 	const domainsuffixfile = "/home/john/projects/gocode/src/certscan/data/effective_tld_names.dat" // should be overrideable
 	const caoidfile = "/home/john/projects/gocode/src/certscan/data/catypetable.csv"                // should be overrideable
-	err := TLDinfo.Loadpublicsuffixlist(domainsuffixfile)                                           // load list
+	err := TLDinfo.Loadpublicsuffixlist(domainsuffixfile)                                           // load domain info
 	if err != nil {
 		panic(err)
 	}
-	err = CAinfo.Loadoidinfo(caoidfile) // load list
+	err = CAinfo.Loadoidinfo(caoidfile) // load CA policy info
 	if err != nil {
 		panic(err)
 	}
-
-	////TLDinfo.Dump()                                                                      // ***TEMP***
-	CAinfo.Dump()
 }
 
 //

@@ -50,6 +50,12 @@ func parseoids(s string) []string {
 	}
 	return (oids)
 }
+//
+//  IsOID  -- test if string has OID syntax
+//
+func IsOID(s string) bool {
+    return reoid.FindString(s) != ""    // true if OID
+}
 
 //
 //  addoids -- add list of OIDs to CApolicyinfo
@@ -123,9 +129,9 @@ func (c *CApolicyinfo) Loadoidinfo(infilename string) error {
 }
 
 //
-//  getpolicy -- get a policy given an OID
+//  Getpolicy -- get a policy given an OID
 //
-func (c *CApolicyinfo) getpolicy(oid string) (Policyinfo, bool) {
+func (c *CApolicyinfo) Getpolicy(oid string) (Policyinfo, bool) {
     if c.policyOID == nil {
     panic("cainfo/getpolicy called without policies loaded.")
     }

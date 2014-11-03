@@ -36,7 +36,5 @@ func TestCAinfo(t *testing.T) {
 	    t.Logf(err.Error())
 		t.FailNow()
     }
-    if t.Verbose() {
-	    CAinfo.Dump()
-	}
+	CAinfo.Dump()
 }
