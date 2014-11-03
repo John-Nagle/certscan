@@ -15,7 +15,7 @@ package main
 import "encoding/csv"
 import "fmt"
 import "flag"
-import "strings"
+////import "strings"
 import "os"
 import "io"
 import "bufio"
@@ -93,85 +93,41 @@ type rechandler func([]string, *csv.Writer) error
 //
 //  keeptest -- do we want to keep this record?
 //
-func keeptest(cfields certumich.Rawcert) (bool, error) {
+func keeptest(cfields certumich.Processedcert) (bool, error) {
 	keep := true // assume keep
 	//  Valid flags check
-	keep = keep && (keepopts.valid || strings.HasPrefix("t", cfields.Is_valid)) // discard if not valid
-	keep = keep && (keepopts.browservalid ||
-		strings.HasPrefix("t", cfields.Is_mozilla_valid) ||
-		strings.HasPrefix("t", cfields.Is_windows_valid) ||
-		strings.HasPrefix("t", cfields.Is_apple_valid)) // discard if not big-name browser valid
-	keep = keep && (keepopts.casigned || !strings.HasPrefix("t", cfields.Is_self_signed)) // discard if self-signed
+	keep = keep && (keepopts.valid || cfields.Valid) // discard if not valid
+	keep = keep && (keepopts.browservalid || cfields.Browservalid) // discard if not big-name browser valid
+	keep = keep && (keepopts.casigned || cfields.CAsigned) // discard if self-signed
 	//  Unpack subject info
-	subjectparams, err := certumich.Unpackparamfields(cfields.Subject) // unpack Subject field
-	if err != nil {
-		return false, err // pass error upward
-	}
-	domain := subjectparams["CN"] // Common Name, i.e. main domain
+	domain := cfields.Commonname // Common Name, i.e. main domain
 	//
 	//  CA Policy check
 	//
 	if keep && keepopts.policy != "" {
-		policyfields := strings.Fields(cfields.X_509_certificatePolicies) // contains policy OIDS, plus other messages
 		////fmt.Printf("'%s' policies:", domain)
 		find := false
-		for i := range policyfields { // for all fields
-			field := policyfields[i]
-			if util.IsOID(field) { // if it looks like an OID
-				keep = keep || keepopts.policy == field   // if it matches an actual policy OID
-				policyitem, ok := CAinfo.Getpolicy(field) // look up policy item
-				if ok {
-					fmt.Printf("Domain '%s' OID %s (%s) from CA %s\n", domain, field, policyitem.Policy, policyitem.CAname) // ***TEMP***
-					find = find || policyitem.Policy == keepopts.policy                                                     // keep if policy matches policy param
-				}
+		for i := range cfields.Policies { // for all fields
+			field := cfields.Policies[i]
+			keep = keep || keepopts.policy == field   // if it matches an actual policy OID
+			policyitem, ok := CAinfo.Getpolicy(field) // look up policy item
+			if ok {
+				fmt.Printf("Domain '%s' OID %s (%s) from CA %s\n", domain, field, policyitem.Policy, policyitem.CAname) // ***TEMP***
+				find = find || policyitem.Policy == keepopts.policy                                                     // keep if policy matches policy param
 			}
 		}
 		keep = keep && find // don't keep unless find
 	}
 	//  Alt names check  
 	if keep && !keepopts.altname { // if requiring alt names
-		altnames := cfields.X_509_subjectAltName // alt names
-		if len(altnames) == 0 {
-			keep = false
-		} else {
-			domains, err := cfields.Unpackaltdomains() // unpack alt names into domains
-			if err != nil {
-				return false, err // pass error upward
+	    if len(cfields.Domains2ld) > 1 {    // if multiple domain cert
+	        keep = true
+            fmt.Printf("Multiple-domain cert: '%s' vs '%s'\n", cfields.Domains2ld[0], cfields.Domains2ld[1]) // ***TEMP***
 			}
-			if domain != "" {
-				domains = append(domains, domain) // add common name to domains
-			}
-			if len(domains) == 0 { // have domains
-				keep = false
-			} else { // check if subdomains of main name		
-				keep = false
-				dtld := ""               // no top-level domain yet
-				d2nd := ""               // no second-level domain yet
-				for i := range domains { // for all domains
-					_, a2nd, atld, aok := TLDinfo.Domainparts(domains[i]) // break apart domain
-					if !aok {                                             // skip any non-domain junk
-						continue
-					}
-					if dtld == "" { // if first TLD found
-						dtld = atld
-						d2nd = a2nd
-					} else {
-						if (atld != dtld) || (a2nd != d2nd) { // if different tld or 2ld
-							fmt.Printf("Multiple-domain cert: '%s.%s' vs '%s.%s'\n", a2nd, atld, d2nd, dtld) // ***TEMP***
-							keep = true
-							break
-						}
-					}
-				}
-			}
-		}
 	}
 	//  Has Organization field check
 	if keep && !keepopts.org {
-		org, foundorg := subjectparams["O"] // test for presence of org
-		if org == subjectparams["CN"] {     // if org is same as the domain name
-			foundorg = false // org not meaningful, ignore
-		}
+		foundorg := cfields.Organization != "" // test for presence of org
 		keep = keep && foundorg // must have Organization field
 	}
 	return keep, nil // final result
@@ -181,15 +137,24 @@ func keeptest(cfields certumich.Rawcert) (bool, error) {
 //  dorec -- handle an input line record, already parsed into fields
 //
 func dorec(fields []string, outf *csv.Writer) error {
+    keep := false                               // keep record for later processing?
 	tally.in++                                 // count in
-	cfields := certumich.Unpackrawcert(fields) // convert to structure format
-	keep, err := keeptest(cfields)             // keep this record?
+	var cfields certumich.Processedcert               // cert in error format
+	cfields, err := certumich.Unpackcert(fields, TLDinfo) // convert to structure format
 	if err != nil {                            // trouble
 		msg := "INVALID RECORD FORMAT: " + err.Error() // create message
 		certumich.Seterror(fields, msg)                // set in record for later use
 		tally.errors++                                 // count errors
 		keep = true                                    // force keep
-	}
+    } else {
+	    keep, err = keeptest(cfields)             // keep this record?
+	    if err != nil {                            // trouble
+		    msg := "KEEP TEST FAILED: " + err.Error() // create message
+		    certumich.Seterror(fields, msg)                // set in record for later use
+		    tally.errors++                                 // count errors
+		    keep = true                                    // force keep
+        }
+    }
 	if (outf != nil) && keep { // if output file
 		err := (*outf).Write(fields) // write output
 		tally.out++                  // count out
@@ -198,16 +163,7 @@ func dorec(fields []string, outf *csv.Writer) error {
 		}
 	}
 	if verbose {
-		subjectparams, err := certumich.Unpackparamfields(cfields.Subject) // unpack Subject field
-		if err != nil {
-			fmt.Printf("Subject field syntax incorrect: %s\n", cfields.Subject)
-		} else {
-			cn := subjectparams["CN"]
-			cnsub, cn2nd, cntld, cnok := TLDinfo.Domainparts(cn)
-			fmt.Printf("CN: '%s'  TLD: '%s'  2LD: '%s'  Subdomain: '%s'  (Valid TLD: %t)\n", cn, cntld, cn2nd, cnsub, cnok)
-		}
-		util.Dumpstrstruct(cfields) // dump ***TEMP***
-		fmt.Printf("\n")
+	    cfields.Dump()
 	}
 	return nil
 }

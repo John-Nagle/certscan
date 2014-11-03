@@ -15,6 +15,7 @@ package certumich
 import "strings"
 import "errors"
 import "certscan/util"
+import "fmt"
 
 //
 //  Constants
@@ -77,11 +78,16 @@ type Rawcert struct {
 //  Processedcert -- raw cert plus some computed info
 //
 type Processedcert struct {
-	Rawcert             // fields of the raw cert
-	Commonname string   // main domain, if any
-	Domains    []string // CN plus alt domains
-	Domains2ld []string // unique second level domains . tld
-	Policies   []string // policy OIDs
+	Rawcert               // fields of the raw cert
+	Commonname   string   // main domain, if any
+	Organization string   // organization, if any
+	Domains      []string // CN plus alt domains
+	Domains2ld   []string // unique second level domains . tld
+	Policies     []string // policy OIDs
+	Valid        bool     // true if valid
+	Browservalid bool     // at least one major browser vendor accepts this cert
+	CAsigned     bool     // true if signed by CA, not self
+	Errors       []string // errors recorded
 }
 
 //
@@ -97,8 +103,10 @@ type NameValue struct {
 //
 //  Input must be an array of 44 strings.
 //
-func Unpackrawcert(s []string) Rawcert {
-	var r Rawcert
+func (r *Rawcert) Unpackrawcert(s []string) error {
+	if len(s) < Fieldcount {
+		return errors.New("Not enough fields in certificate record")
+	}
 	r.Certificate_id = s[0]
 	r.Hex_encoded_SHA_1_fingerprint = s[1]
 	r.Serial_number = s[2]
@@ -143,7 +151,7 @@ func Unpackrawcert(s []string) Rawcert {
 	r.Is_revoked = s[41]
 	r.Revoked_at = s[42]
 	r.Reason_revoked = s[43]
-	return r
+	return nil // success
 }
 
 //
@@ -222,7 +230,7 @@ func Unpackparamfields(s string) (KeyValueMap, error) {
 //
 //  Unpackcertpolicies  -- extract cert policy OIDs for later use
 //
-func (c *Processedcert) Unpackcertpolicies() {
+func (c *Processedcert) Unpackcertpolicies() error {
 	policyfields := strings.Fields(c.X_509_certificatePolicies) // contains policy OIDS, plus other messages
 	c.Policies = make([]string, 0, 1)                           // seldom more than 1 OID
 	for i := range policyfields {                               // for all fields
@@ -231,12 +239,15 @@ func (c *Processedcert) Unpackcertpolicies() {
 			c.Policies = append(c.Policies, field) // append to OIDs
 		}
 	}
+	return nil
 }
 
 //  
-//  Unpack2lds  -- unpack second level domains.
+//  Unpacksubject  -- unpack subject field
 //
-func (c *Processedcert) Unpack2lds(TLDinfo util.DomainSuffixes) error {
+//  Finds any second levle domains
+//
+func (c *Processedcert) Unpacksubject(TLDinfo util.DomainSuffixes) error {
 	c.Domains = make([]string, 0, 2)                   // result domains
 	c.Domains2ld = make([]string, 0, 2)                // result second level domains
 	subjectparams, err := Unpackparamfields(c.Subject) // unpack Subject field
@@ -244,6 +255,7 @@ func (c *Processedcert) Unpack2lds(TLDinfo util.DomainSuffixes) error {
 		return err // pass error upward
 	}
 	c.Commonname = subjectparams["CN"]    // Common Name, i.e. main domain
+	c.Organization = subjectparams["O"]   // Organization
 	c.Domains, err = c.Unpackaltdomains() // unpack alt names into domains
 	if err != nil {
 		return err // pass error upward
@@ -267,6 +279,32 @@ func (c *Processedcert) Unpack2lds(TLDinfo util.DomainSuffixes) error {
 }
 
 //
+//  Unpackcert -- unpack cert into structure for further processing
+//
+func Unpackcert(s []string, tldinfo util.DomainSuffixes) (Processedcert, error) {
+	var c Processedcert       // cert after processing
+	err := c.Unpackrawcert(s) // unpack basic fields as strings
+	if err != nil {
+		return c, err
+	}
+	//  Misc. fields to unpack
+	c.Valid = strings.HasPrefix("t", c.Is_valid) // discard if not valid
+	c.Browservalid = strings.HasPrefix("t", c.Is_mozilla_valid) ||
+		strings.HasPrefix("t", c.Is_windows_valid) ||
+		strings.HasPrefix("t", c.Is_apple_valid) // valid in at least one big-name browser
+	c.CAsigned = !strings.HasPrefix("t", c.Is_self_signed) // signed by CA, not self
+	err = c.Unpacksubject(tldinfo)                         // unpack second level domains
+	if err != nil {
+		return c, err
+	}
+	err = c.Unpackcertpolicies() // unpack cert policy field
+	if err != nil {
+		return c, err
+	}
+	return c, nil // success       
+}
+
+//
 //  Seterror -- set an error message into the array of fields for later use
 //
 //  Put in the field OpenSSL_validation_error
@@ -276,4 +314,19 @@ func Seterror(fields []string, msg string) {
 	if len(strings.TrimSpace(fields[ERRFIELD])) == 0 {
 		fields[ERRFIELD] = "***ERROR*** " + msg // put msg in record if no other error
 	}
+}
+
+//
+//  Dump -- dump this object
+//
+func (c *Processedcert) Dump() {
+	fmt.Printf("Cert CN: '%s'  Organization: '%s'\n", c.Commonname, c.Organization)
+	fmt.Printf("  Second level domains: ")
+	for i := range c.Domains2ld {
+		fmt.Printf(" '%s'", c.Domains2ld[i])
+	}
+	fmt.Println("")
+	util.Dumpstrstruct(c.Rawcert) // dump fields of raw CSV record
+	fmt.Printf("\n")
+
 }
