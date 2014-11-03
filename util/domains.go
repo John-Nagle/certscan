@@ -45,7 +45,7 @@ type DomainSuffixes struct {
 //
 func Reversedomain(s string) string {
 	parts := strings.Split(s, ".") // split into parts
-	nparts := len(parts)            // in-place reverse        
+	nparts := len(parts)           // in-place reverse        
 	for i := 0; i < nparts/2; i++ {
 		tmp := parts[nparts-i-1] // swap
 		parts[nparts-i-1] = parts[i]
@@ -53,14 +53,16 @@ func Reversedomain(s string) string {
 	}
 	return strings.Join(parts, ".") // return as string       
 }
+
 //
 //  Samesecondleveldomain -- true if two domains have the same second level domain
 //
-func (d* DomainSuffixes) Samesecondleveldomain(a string, b string) (bool, bool) {
-    _, a2nd, atld, aok := d.Domainparts(a)                   // break apart domain
-    _, b2nd, btld, bok := d.Domainparts(b)
-    return (atld == btld) && (a2nd == b2nd), aok && bok         // return true if matched
+func (d *DomainSuffixes) Samesecondleveldomain(a string, b string) (bool, bool) {
+	_, a2nd, atld, aok := d.Domainparts(a) // break apart domain
+	_, b2nd, btld, bok := d.Domainparts(b)
+	return (atld == btld) && (a2nd == b2nd), aok && bok // return true if matched
 }
+
 //
 //  Domainparts  -- break up domain name into public TLD, 2nd level domain, and local subdomain
 //
@@ -72,17 +74,17 @@ func (d *DomainSuffixes) Domainparts(s string) (string, string, string, bool) {
 	if d.reversedsuffixes == nil {
 		panic("DomainSuffixes not loaded")
 	}
-	parts := strings.Split(s, ".") // domain parts
-	for i := 0; i < len(parts); i++ {   // finding longest TLD that matches
-	    tld := strings.Join(parts[i:],".")              // candidate TLD
+	parts := strings.Split(s, ".")    // domain parts
+	for i := 0; i < len(parts); i++ { // finding longest TLD that matches
+		tld := strings.Join(parts[i:], ".")         // candidate TLD
 		if d.reversedsuffixes[Reversedomain(tld)] { // if matched TLD
-		    switch {	    
-		    case  i == 0 :
-		        return "","",tld, false                 // this is a TLD - it has no 2nd
-		    case  i == 1:
-		        return "",parts[0], tld, true           // second level domain
-		    default: 
-			    return strings.Join(parts[0 : i-1],"."), parts[i-1], tld, true // sub, 2nd, tld, OK
+			switch {
+			case i == 0:
+				return "", "", tld, false // this is a TLD - it has no 2nd
+			case i == 1:
+				return "", parts[0], tld, true // second level domain
+			default:
+				return strings.Join(parts[0:i-1], "."), parts[i-1], tld, true // sub, 2nd, tld, OK
 			}
 		}
 	}
@@ -108,10 +110,10 @@ func (d *DomainSuffixes) Loadpublicsuffixlist(infile string) error {
 			panic(err) // failed close is legit panic
 		}
 	}()
-    d.reversedsuffixes = make(map[string]bool)   // suffix set - value always true
-	r := bufio.NewReader(fi) // make a read buffer
-	inicann := false         // not in ICANN block yet
-	for {                    // until EOF
+	d.reversedsuffixes = make(map[string]bool) // suffix set - value always true
+	r := bufio.NewReader(fi)                   // make a read buffer
+	inicann := false                           // not in ICANN block yet
+	for {                                      // until EOF
 		s, err := r.ReadString('\n') // read a line
 		if err != nil {              // EOF or error
 			if err == io.EOF { // if EOF
@@ -145,10 +147,10 @@ func (d *DomainSuffixes) Loadpublicsuffixlist(infile string) error {
 	}
 	// finish up
 	if len(d.reversedsuffixes) < 1 { // did not find any domains
-	    d.reversedsuffixes = nil    // no map
+		d.reversedsuffixes = nil                                          // no map
 		return errors.New("No domain suffixes in suffix file: " + infile) // must be bogus file
 	}
-	return nil      // normal return
+	return nil // normal return
 }
 
 //
@@ -157,9 +159,9 @@ func (d *DomainSuffixes) Loadpublicsuffixlist(infile string) error {
 func (d *DomainSuffixes) Dump() {
 	fmt.Printf("Domain suffixes. Loaded=%t.\n", d.reversedsuffixes != nil) // dump to standard output
 	if d.reversedsuffixes != nil {
-	    fmt.Printf(" %d domain suffixes:\n", len(d.reversedsuffixes))
-	    for key, _ := range d.reversedsuffixes {
-		    fmt.Printf("  '%s'\n", key) 
+		fmt.Printf(" %d domain suffixes:\n", len(d.reversedsuffixes))
+		for key, _ := range d.reversedsuffixes {
+			fmt.Printf("  '%s'\n", key)
 		}
 	}
 }

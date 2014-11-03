@@ -72,15 +72,16 @@ type Rawcert struct {
 	Revoked_at                       string
 	Reason_revoked                   string
 }
+
 //
 //  Processedcert -- raw cert plus some computed info
 //
 type Processedcert struct {
-    Rawcert                         // fields of the raw cert
-    Commonname                      string      // main domain, if any
-    Domains                         []string    // CN plus alt domains
-    Domains2ld                      []string    // unique second level domains . tld
-    Policies                        []string    // policy OIDs
+	Rawcert             // fields of the raw cert
+	Commonname string   // main domain, if any
+	Domains    []string // CN plus alt domains
+	Domains2ld []string // unique second level domains . tld
+	Policies   []string // policy OIDs
 }
 
 //
@@ -217,52 +218,53 @@ func Unpackparamfields(s string) (KeyValueMap, error) {
 	err := addparamtomap(d, workfield)
 	return d, err
 }
+
 //
 //  Unpackcertpolicies  -- extract cert policy OIDs for later use
 //
 func (c *Processedcert) Unpackcertpolicies() {
-    policyfields := strings.Fields(c.X_509_certificatePolicies) // contains policy OIDS, plus other messages
-    c.Policies = make([]string,0,1)                      // seldom more than 1 OID
-	for i := range(policyfields) {                      // for all fields
-        field := policyfields[i]             
-        if util.IsOID(field) {                          // if it looks like an OID
-            c.Policies = append(c.Policies, field)      // append to OIDs
-        }
+	policyfields := strings.Fields(c.X_509_certificatePolicies) // contains policy OIDS, plus other messages
+	c.Policies = make([]string, 0, 1)                           // seldom more than 1 OID
+	for i := range policyfields {                               // for all fields
+		field := policyfields[i]
+		if util.IsOID(field) { // if it looks like an OID
+			c.Policies = append(c.Policies, field) // append to OIDs
+		}
 	}
-}	
+}
+
 //  
 //  Unpack2lds  -- unpack second level domains.
 //
-func (c *Processedcert) Unpack2lds(TLDinfo util.DomainSuffixes) (error) {
-    c.Domains = make([]string,0,2)                      // result domains
-    c.Domains2ld = make([]string,0,2)                   // result second level domains
-	subjectparams, err := Unpackparamfields(c.Subject)  // unpack Subject field
+func (c *Processedcert) Unpack2lds(TLDinfo util.DomainSuffixes) error {
+	c.Domains = make([]string, 0, 2)                   // result domains
+	c.Domains2ld = make([]string, 0, 2)                // result second level domains
+	subjectparams, err := Unpackparamfields(c.Subject) // unpack Subject field
 	if err != nil {
 		return err // pass error upward
 	}
-	c.Commonname = subjectparams["CN"]                  // Common Name, i.e. main domain
-    c.Domains, err = c.Unpackaltdomains()               // unpack alt names into domains
+	c.Commonname = subjectparams["CN"]    // Common Name, i.e. main domain
+	c.Domains, err = c.Unpackaltdomains() // unpack alt names into domains
 	if err != nil {
-	    return err // pass error upward
+		return err // pass error upward
 	}
 	if c.Commonname != "" {
-	    c.Domains = append(c.Domains, c.Commonname)     // first domain if present
-    }
-    //  Now have list of domains.  See which ones are unique second level domains
-    map2tld := make(map[string] bool)                     // second level domains, set
-    for i := range c.Domains { // for all domains
-	    _, a2nd, atld, aok := TLDinfo.Domainparts(c.Domains[i]) // break apart domain
-		if !aok {                                             // skip any non-domain junk
-		    continue
+		c.Domains = append(c.Domains, c.Commonname) // first domain if present
+	}
+	//  Now have list of domains.  See which ones are unique second level domains
+	map2tld := make(map[string]bool) // second level domains, set
+	for i := range c.Domains {       // for all domains
+		_, a2nd, atld, aok := TLDinfo.Domainparts(c.Domains[i]) // break apart domain
+		if !aok {                                               // skip any non-domain junk
+			continue
 		}
-		map2tld[a2nd + "." + atld] = true               // add to map
-    }
-    for k, _ := range(map2tld) {                        // map keys -> array of strings
-        c.Domains2ld = append(c.Domains2ld, k)          // lambdas in Go would be nice but are not essential
-    }
-    return nil                                          // success
+		map2tld[a2nd+"."+atld] = true // add to map
+	}
+	for k, _ := range map2tld { // map keys -> array of strings
+		c.Domains2ld = append(c.Domains2ld, k) // lambdas in Go would be nice but are not essential
+	}
+	return nil // success
 }
-
 
 //
 //  Seterror -- set an error message into the array of fields for later use

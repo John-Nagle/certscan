@@ -50,11 +50,12 @@ func parseoids(s string) []string {
 	}
 	return (oids)
 }
+
 //
 //  IsOID  -- test if string has OID syntax
 //
 func IsOID(s string) bool {
-    return reoid.FindString(s) != ""    // true if OID
+	return reoid.FindString(s) != "" // true if OID
 }
 
 //
@@ -122,7 +123,7 @@ func (c *CApolicyinfo) Loadoidinfo(infilename string) error {
 		c.loadline(fields) // load one line from file
 	}
 	if len(c.policyOID) < 1 { // did not find any domains
-	    c.policyOID = nil    // no map
+		c.policyOID = nil                                                       // no map
 		return errors.New("No CA policy OIDs found in OID file: " + infilename) // must be bogus file
 	}
 	return nil // normal return
@@ -132,12 +133,13 @@ func (c *CApolicyinfo) Loadoidinfo(infilename string) error {
 //  Getpolicy -- get a policy given an OID
 //
 func (c *CApolicyinfo) Getpolicy(oid string) (Policyinfo, bool) {
-    if c.policyOID == nil {
-    panic("cainfo/getpolicy called without policies loaded.")
-    }
-    v, ok :=  c.policyOID[oid]      // value, true if success
-    return v, ok
+	if c.policyOID == nil {
+		panic("cainfo/getpolicy called without policies loaded.")
+	}
+	v, ok := c.policyOID[oid] // value, true if success
+	return v, ok
 }
+
 //
 //  Dump -- dump for debug
 //
