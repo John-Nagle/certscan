@@ -15,6 +15,7 @@ package main
 import "encoding/csv"
 import "fmt"
 import "flag"
+
 ////import "strings"
 import "os"
 import "io"
@@ -96,9 +97,9 @@ type rechandler func([]string, *csv.Writer) error
 func keeptest(cfields certumich.Processedcert) (bool, error) {
 	keep := true // assume keep
 	//  Valid flags check
-	keep = keep && (keepopts.valid || cfields.Valid) // discard if not valid
+	keep = keep && (keepopts.valid || cfields.Valid)               // discard if not valid
 	keep = keep && (keepopts.browservalid || cfields.Browservalid) // discard if not big-name browser valid
-	keep = keep && (keepopts.casigned || cfields.CAsigned) // discard if self-signed
+	keep = keep && (keepopts.casigned || cfields.CAsigned)         // discard if self-signed
 	//  Unpack subject info
 	domain := cfields.Commonname // Common Name, i.e. main domain
 	//
@@ -120,15 +121,15 @@ func keeptest(cfields certumich.Processedcert) (bool, error) {
 	}
 	//  Alt names check  
 	if keep && !keepopts.altname { // if requiring alt names
-	    if len(cfields.Domains2ld) > 1 {    // if multiple domain cert
-	        keep = true
-            fmt.Printf("Multiple-domain cert: '%s' vs '%s'\n", cfields.Domains2ld[0], cfields.Domains2ld[1]) // ***TEMP***
-			}
+		if len(cfields.Domains2ld) > 1 { // if multiple domain cert
+			keep = true
+			fmt.Printf("Multiple-domain cert: '%s' vs '%s'\n", cfields.Domains2ld[0], cfields.Domains2ld[1]) // ***TEMP***
+		}
 	}
 	//  Has Organization field check
 	if keep && !keepopts.org {
 		foundorg := cfields.Organization != "" // test for presence of org
-		keep = keep && foundorg // must have Organization field
+		keep = keep && foundorg                // must have Organization field
 	}
 	return keep, nil // final result
 }
@@ -137,24 +138,24 @@ func keeptest(cfields certumich.Processedcert) (bool, error) {
 //  dorec -- handle an input line record, already parsed into fields
 //
 func dorec(fields []string, outf *csv.Writer) error {
-    keep := false                               // keep record for later processing?
-	tally.in++                                 // count in
-	var cfields certumich.Processedcert               // cert in error format
+	keep := false                                         // keep record for later processing?
+	tally.in++                                            // count in
+	var cfields certumich.Processedcert                   // cert in error format
 	cfields, err := certumich.Unpackcert(fields, TLDinfo) // convert to structure format
-	if err != nil {                            // trouble
+	if err != nil {                                       // trouble
 		msg := "INVALID RECORD FORMAT: " + err.Error() // create message
 		certumich.Seterror(fields, msg)                // set in record for later use
 		tally.errors++                                 // count errors
 		keep = true                                    // force keep
-    } else {
-	    keep, err = keeptest(cfields)             // keep this record?
-	    if err != nil {                            // trouble
-		    msg := "KEEP TEST FAILED: " + err.Error() // create message
-		    certumich.Seterror(fields, msg)                // set in record for later use
-		    tally.errors++                                 // count errors
-		    keep = true                                    // force keep
-        }
-    }
+	} else {
+		keep, err = keeptest(cfields) // keep this record?
+		if err != nil {               // trouble
+			msg := "KEEP TEST FAILED: " + err.Error() // create message
+			certumich.Seterror(fields, msg)           // set in record for later use
+			tally.errors++                            // count errors
+			keep = true                               // force keep
+		}
+	}
 	if (outf != nil) && keep { // if output file
 		err := (*outf).Write(fields) // write output
 		tally.out++                  // count out
@@ -163,7 +164,7 @@ func dorec(fields []string, outf *csv.Writer) error {
 		}
 	}
 	if verbose {
-	    cfields.Dump()
+		cfields.Dump()
 	}
 	return nil
 }
