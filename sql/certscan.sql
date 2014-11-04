@@ -5,6 +5,14 @@
 --  SSL certificate dumps.  Not of permanent value;
 --  stored in SQL format to allow easy data analysis.
 --
+--
+--  UTF-8 everywhere
+--
+USE sslcerts;
+ALTER DATABASE sslcerts DEFAULT collate utf8_general_ci DEFAULT character set utf8;
+--
+--  certs - fields of interest from U. Mich. certificate dump
+--
 CREATE TABLE certs (
     --  Fields from U. Mich certificate dump
 	Certificate_id                   BIGINT PRIMARY KEY,
@@ -51,7 +59,7 @@ CREATE TABLE certs (
 	Is_revoked                       BOOL,
 	####Revoked_at                       string
 	Reason_revoked                   TEXT,
-    --  Derived fields
+    --  Derived fields extracted from certificate.
     Issuer_name                     VARCHAR(127),
     Subject_commonname              VARCHAR(127),
     Subject_organization            TEXT,
@@ -75,7 +83,7 @@ CREATE TABLE domains (
 --
 --  policies --  Certificate policy OIDs associated with certificates above
 --
-CREATE TABLE policies (
-    Certificate_id                  BIGINT,
-    OID                             VARCHAR(20)
+    CREATE TABLE policies (
+        Certificate_id                  BIGINT,
+        OID                             VARCHAR(20)
 );
