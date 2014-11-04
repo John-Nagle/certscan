@@ -101,12 +101,11 @@ func keeptest(cfields certumich.Processedcert) (bool, error) {
 	keep = keep && (keepopts.browservalid || cfields.Browservalid) // discard if not big-name browser valid
 	keep = keep && (keepopts.casigned || cfields.CAsigned)         // discard if self-signed
 	//  Unpack subject info
-	domain := cfields.Commonname // Common Name, i.e. main domain
+	domain := cfields.Subject_commonname // Common Name, i.e. main domain
 	//
 	//  CA Policy check
 	//
 	if keep && keepopts.policy != "" {
-		////fmt.Printf("'%s' policies:", domain)
 		find := false
 		for i := range cfields.Policies { // for all fields
 			field := cfields.Policies[i]
@@ -128,7 +127,7 @@ func keeptest(cfields certumich.Processedcert) (bool, error) {
 	}
 	//  Has Organization field check
 	if keep && !keepopts.org {
-		foundorg := cfields.Organization != "" // test for presence of org
+		foundorg := cfields.Subject_organization != "" // test for presence of org
 		keep = keep && foundorg                // must have Organization field
 	}
 	return keep, nil // final result

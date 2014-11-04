@@ -16,6 +16,7 @@ import "strings"
 import "errors"
 import "certscan/util"
 import "fmt"
+import "time"
 
 //
 //  Constants
@@ -79,8 +80,14 @@ type Rawcert struct {
 //
 type Processedcert struct {
 	Rawcert               // fields of the raw cert
-	Commonname   string   // main domain, if any
-	Organization string   // organization, if any
+	Issuer_name string // name of CA issuing cert
+	Subject_commonname   string   // CN main domain, if any
+	Subject_organization string   // O organization, if any
+	Subject_organizationunit string // OU organization unit, if any
+	Subject_location string // L location, if any
+	Subject_countrycode string // CO countrycode, if any
+	Not_valid_before_time time.Time // beginning of valid interval
+	Not_valid_after_time time.Time  // end of valid interval
 	Domains      []string // CN plus alt domains
 	Domains2ld   []string // unique second level domains . tld
 	Policies     []string // policy OIDs
@@ -241,11 +248,21 @@ func (c *Processedcert) Unpackcertpolicies() error {
 	}
 	return nil
 }
-
+//
+//  Unpackissuer -- unpack issuer field
+//
+func (c *Processedcert) Unpackissuer() error {
+	issuerparams, err := Unpackparamfields(c.Issuer) // unpack Subject field
+	if err != nil {
+		return err // pass error upward
+	}
+	c.Issuer_name = issuerparams["CN"]              // common name of issuer
+	return nil
+}
 //  
 //  Unpacksubject  -- unpack subject field
 //
-//  Finds any second levle domains
+//  Finds any second level domains
 //
 func (c *Processedcert) Unpacksubject(TLDinfo util.DomainSuffixes) error {
 	c.Domains = make([]string, 0, 2)                   // result domains
@@ -254,14 +271,17 @@ func (c *Processedcert) Unpacksubject(TLDinfo util.DomainSuffixes) error {
 	if err != nil {
 		return err // pass error upward
 	}
-	c.Commonname = subjectparams["CN"]    // Common Name, i.e. main domain
-	c.Organization = subjectparams["O"]   // Organization
+	c.Subject_commonname = subjectparams["CN"]    // Common Name, i.e. main domain
+	c.Subject_organization = subjectparams["O"]   // Organization
+	c.Subject_organizationunit = subjectparams["OU"]
+	c.Subject_location = subjectparams["L"]
+	c.Subject_countrycode = subjectparams["C"]
 	c.Domains, err = c.Unpackaltdomains() // unpack alt names into domains
 	if err != nil {
 		return err // pass error upward
 	}
-	if c.Commonname != "" {
-		c.Domains = append(c.Domains, c.Commonname) // first domain if present
+	if c.Subject_commonname != "" {
+		c.Domains = append(c.Domains, c.Subject_commonname) // first domain if present
 	}
 	//  Now have list of domains.  See which ones are unique second level domains
 	map2tld := make(map[string]bool) // second level domains, set
@@ -282,6 +302,7 @@ func (c *Processedcert) Unpacksubject(TLDinfo util.DomainSuffixes) error {
 //  Unpackcert -- unpack cert into structure for further processing
 //
 func Unpackcert(s []string, tldinfo util.DomainSuffixes) (Processedcert, error) {
+    const CERTTIME = "2006-01-02 15:04:05"                  // format of timestamp in SSL cert
 	var c Processedcert       // cert after processing
 	err := c.Unpackrawcert(s) // unpack basic fields as strings
 	if err != nil {
@@ -293,6 +314,20 @@ func Unpackcert(s []string, tldinfo util.DomainSuffixes) (Processedcert, error) 
 		strings.HasPrefix("t", c.Is_windows_valid) ||
 		strings.HasPrefix("t", c.Is_apple_valid) // valid in at least one big-name browser
 	c.CAsigned = !strings.HasPrefix("t", c.Is_self_signed) // signed by CA, not self
+	c.Not_valid_before_time, err = time.Parse(CERTTIME, c.Not_valid_before) // date range for cert
+	if err != nil {
+		return c, err
+	}
+	c.Not_valid_after_time, err = time.Parse(CERTTIME, c.Not_valid_after)
+	if err != nil {
+		return c, err
+	}	
+	
+	//  Unpack structured fields
+	err = c.Unpackissuer()                                  // unpack issuer field
+	if err != nil {
+		return c, err
+	}	
 	err = c.Unpacksubject(tldinfo)                         // unpack second level domains
 	if err != nil {
 		return c, err
@@ -320,7 +355,9 @@ func Seterror(fields []string, msg string) {
 //  Dump -- dump this object
 //
 func (c *Processedcert) Dump() {
-	fmt.Printf("Cert CN: '%s'  Organization: '%s'\n", c.Commonname, c.Organization)
+	fmt.Printf("Cert CN: '%s'  Organization: '%s'  Location: %s (%s).  Issued by '%s'\n",
+	     c.Subject_commonname, c.Subject_organization, c.Subject_location, c.Subject_countrycode, c.Issuer_name)
+	fmt.Printf("  Valid from %s to %s.\n", c.Not_valid_before_time.Format(time.ANSIC), c.Not_valid_after_time.Format(time.ANSIC))
 	fmt.Printf("  Second level domains: ")
 	for i := range c.Domains2ld {
 		fmt.Printf(" '%s'", c.Domains2ld[i])
