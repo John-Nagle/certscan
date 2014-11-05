@@ -118,7 +118,7 @@ func keeptest(cfields certumich.Processedcert) (bool, error) {
 		}
 		keep = keep && find // don't keep unless find
 	}
-	//  Alt names check  
+	//  Alt names check
 	if keep && !keepopts.altname { // if requiring alt names
 		if len(cfields.Domains2ld) > 1 { // if multiple domain cert
 			keep = true
@@ -128,7 +128,7 @@ func keeptest(cfields certumich.Processedcert) (bool, error) {
 	//  Has Organization field check
 	if keep && !keepopts.org {
 		foundorg := cfields.Subject_organization != "" // test for presence of org
-		keep = keep && foundorg                // must have Organization field
+		keep = keep && foundorg                        // must have Organization field
 	}
 	return keep, nil // final result
 }
@@ -170,7 +170,7 @@ func dorec(fields []string, outf *csv.Writer) error {
 
 //
 //  readinputfile -- handle an input file
-//    
+//
 func readinputfile(infilename string, fn rechandler, outf *csv.Writer) (int, error) {
 	badlinecount := 0              // no bad lines yet
 	fi, err := os.Open(infilename) // open input file

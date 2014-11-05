@@ -79,22 +79,22 @@ type Rawcert struct {
 //  Processedcert -- raw cert plus some computed info
 //
 type Processedcert struct {
-	Rawcert               // fields of the raw cert
-	Issuer_name string // name of CA issuing cert
-	Subject_commonname   string   // CN main domain, if any
-	Subject_organization string   // O organization, if any
-	Subject_organizationunit string // OU organization unit, if any
-	Subject_location string // L location, if any
-	Subject_countrycode string // CO countrycode, if any
-	Not_valid_before_time time.Time // beginning of valid interval
-	Not_valid_after_time time.Time  // end of valid interval
-	Domains      []string // CN plus alt domains
-	Domains2ld   []string // unique second level domains . tld
-	Policies     []string // policy OIDs
-	Valid        bool     // true if valid
-	Browservalid bool     // at least one major browser vendor accepts this cert
-	CAsigned     bool     // true if signed by CA, not self
-	Errors       []string // errors recorded
+	Rawcert                            // fields of the raw cert
+	Issuer_name              string    // name of CA issuing cert
+	Subject_commonname       string    // CN main domain, if any
+	Subject_organization     string    // O organization, if any
+	Subject_organizationunit string    // OU organization unit, if any
+	Subject_location         string    // L location, if any
+	Subject_countrycode      string    // CO countrycode, if any
+	Not_valid_before_time    time.Time // beginning of valid interval
+	Not_valid_after_time     time.Time // end of valid interval
+	Domains                  []string  // CN plus alt domains
+	Domains2ld               []string  // unique second level domains . tld
+	Policies                 []string  // policy OIDs
+	Valid                    bool      // true if valid
+	Browservalid             bool      // at least one major browser vendor accepts this cert
+	CAsigned                 bool      // true if signed by CA, not self
+	Errors                   []string  // errors recorded
 }
 
 //
@@ -185,14 +185,14 @@ func (cfields *Rawcert) Unpackaltdomains() ([]string, error) {
 		typepart := strings.TrimSpace(typevalue[0])
 		domain := strings.TrimSpace(typevalue[1])
 		if typepart == "DNS" || typepart == "dns" {
-			domains = append(domains, domain) // add to 
+			domains = append(domains, domain) // add to
 		}
 	}
 	return domains, nil // normal return
 }
 
 type KeyValueMap map[string]string // a key/value map
-//  
+//
 //  addparamtomap - break "X=Y" form into name, value and add to map.
 //
 func addparamtomap(d KeyValueMap, field string) error {
@@ -248,6 +248,7 @@ func (c *Processedcert) Unpackcertpolicies() error {
 	}
 	return nil
 }
+
 //
 //  Unpackissuer -- unpack issuer field
 //
@@ -256,10 +257,11 @@ func (c *Processedcert) Unpackissuer() error {
 	if err != nil {
 		return err // pass error upward
 	}
-	c.Issuer_name = issuerparams["CN"]              // common name of issuer
+	c.Issuer_name = issuerparams["CN"] // common name of issuer
 	return nil
 }
-//  
+
+//
 //  Unpacksubject  -- unpack subject field
 //
 //  Finds any second level domains
@@ -271,8 +273,8 @@ func (c *Processedcert) Unpacksubject(TLDinfo util.DomainSuffixes) error {
 	if err != nil {
 		return err // pass error upward
 	}
-	c.Subject_commonname = subjectparams["CN"]    // Common Name, i.e. main domain
-	c.Subject_organization = subjectparams["O"]   // Organization
+	c.Subject_commonname = subjectparams["CN"]  // Common Name, i.e. main domain
+	c.Subject_organization = subjectparams["O"] // Organization
 	c.Subject_organizationunit = subjectparams["OU"]
 	c.Subject_location = subjectparams["L"]
 	c.Subject_countrycode = subjectparams["C"]
@@ -302,9 +304,9 @@ func (c *Processedcert) Unpacksubject(TLDinfo util.DomainSuffixes) error {
 //  Unpackcert -- unpack cert into structure for further processing
 //
 func Unpackcert(s []string, tldinfo util.DomainSuffixes) (Processedcert, error) {
-    const CERTTIME = "2006-01-02 15:04:05"                  // format of timestamp in SSL cert
-	var c Processedcert       // cert after processing
-	err := c.Unpackrawcert(s) // unpack basic fields as strings
+	const CERTTIME = "2006-01-02 15:04:05" // format of timestamp in SSL cert
+	var c Processedcert                    // cert after processing
+	err := c.Unpackrawcert(s)              // unpack basic fields as strings
 	if err != nil {
 		return c, err
 	}
@@ -313,7 +315,7 @@ func Unpackcert(s []string, tldinfo util.DomainSuffixes) (Processedcert, error) 
 	c.Browservalid = strings.HasPrefix("t", c.Is_mozilla_valid) ||
 		strings.HasPrefix("t", c.Is_windows_valid) ||
 		strings.HasPrefix("t", c.Is_apple_valid) // valid in at least one big-name browser
-	c.CAsigned = !strings.HasPrefix("t", c.Is_self_signed) // signed by CA, not self
+	c.CAsigned = !strings.HasPrefix("t", c.Is_self_signed)                  // signed by CA, not self
 	c.Not_valid_before_time, err = time.Parse(CERTTIME, c.Not_valid_before) // date range for cert
 	if err != nil {
 		return c, err
@@ -321,14 +323,14 @@ func Unpackcert(s []string, tldinfo util.DomainSuffixes) (Processedcert, error) 
 	c.Not_valid_after_time, err = time.Parse(CERTTIME, c.Not_valid_after)
 	if err != nil {
 		return c, err
-	}	
-	
+	}
+
 	//  Unpack structured fields
-	err = c.Unpackissuer()                                  // unpack issuer field
+	err = c.Unpackissuer() // unpack issuer field
 	if err != nil {
 		return c, err
-	}	
-	err = c.Unpacksubject(tldinfo)                         // unpack second level domains
+	}
+	err = c.Unpacksubject(tldinfo) // unpack second level domains
 	if err != nil {
 		return c, err
 	}
@@ -336,7 +338,7 @@ func Unpackcert(s []string, tldinfo util.DomainSuffixes) (Processedcert, error) 
 	if err != nil {
 		return c, err
 	}
-	return c, nil // success       
+	return c, nil // success
 }
 
 //
@@ -356,7 +358,7 @@ func Seterror(fields []string, msg string) {
 //
 func (c *Processedcert) Dump() {
 	fmt.Printf("Cert CN: '%s'  Organization: '%s'  Location: %s (%s).  Issued by '%s'\n",
-	     c.Subject_commonname, c.Subject_organization, c.Subject_location, c.Subject_countrycode, c.Issuer_name)
+		c.Subject_commonname, c.Subject_organization, c.Subject_location, c.Subject_countrycode, c.Issuer_name)
 	fmt.Printf("  Valid from %s to %s.\n", c.Not_valid_before_time.Format(time.ANSIC), c.Not_valid_after_time.Format(time.ANSIC))
 	fmt.Printf("  Second level domains: ")
 	for i := range c.Domains2ld {
