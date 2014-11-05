@@ -1,7 +1,7 @@
 //
 //  cainfo.go -- Certificate Authority information
 //
-//  
+//
 //
 //  John Nagle
 //  SiteTruth
@@ -29,7 +29,7 @@ type Policyinfo struct {
 
 //
 //  CApolicyinfo -- collect info about CAs
-// 
+//
 type CApolicyinfo struct {
 	policyOID map[string]Policyinfo // policy lookup
 }

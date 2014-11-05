@@ -46,13 +46,13 @@ type DomainSuffixes struct {
 //
 func Reversedomain(s string) string {
 	parts := strings.Split(s, ".") // split into parts
-	nparts := len(parts)           // in-place reverse        
+	nparts := len(parts)           // in-place reverse
 	for i := 0; i < nparts/2; i++ {
 		tmp := parts[nparts-i-1] // swap
 		parts[nparts-i-1] = parts[i]
 		parts[i] = tmp
 	}
-	return strings.Join(parts, ".") // return as string       
+	return strings.Join(parts, ".") // return as string
 }
 
 //
@@ -142,9 +142,9 @@ func (d *DomainSuffixes) Loadpublicsuffixlist(infile string) error {
 		} else { // non-comment
 			if inicann { // save ICANN names only
 				//  ***SHOULD VALIDATE DOMAIN SYNTAX HERE***
-				domain, err := idna.ToUnicode(s)    // all Unicode, no punycode
+				domain, err := idna.ToUnicode(s) // all Unicode, no punycode
 				if err != nil {
-				    return err
+					return err
 				}
 				d.reversedsuffixes[Reversedomain(domain)] = true // add to domain suffixes
 			}

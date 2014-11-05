@@ -13,6 +13,7 @@
 package certumich
 
 import "strings"
+import "strconv"
 import "errors"
 import "certscan/util"
 import "fmt"
@@ -93,9 +94,45 @@ type Processedcert struct {
 	Domains2ld               []string  // unique second level domains . tld
 	Policies                 []string  // policy OIDs
 	Valid                    bool      // true if valid
-	Browservalid             bool      // at least one major browser vendor accepts this cert
+	Is_browser_valid         bool      // at least one major browser vendor accepts this cert
 	CAsigned                 bool      // true if signed by CA, not self
 	Errors                   []string  // errors recorded
+}
+
+//
+//  PackCertforSQL -- pack processed cert into fields for SQL LOAD DATA INFILE use
+//
+func (c *Processedcert) PackcertforSQL()(string) {
+    const Fieldcount = 25
+    ////var fields [Fieldcount]string      // 
+    var fields []string = make([]string, Fieldcount, Fieldcount)
+    fields[0] = util.ToSQLint(c.Certificate_id)
+	fields[1] = util.ToSQLint(c.Serial_number)              
+	fields[2] = util.ToSQLint(c.Issuer_id)
+	fields[3] = util.ToSQLstring(c.Version)
+	fields[4] = util.ToSQLbool(c.Is_ca)
+	fields[5] = util.ToSQLbool(c.Is_self_signed)
+	fields[6] = util.ToSQLdatetime(c.Not_valid_before_time)       
+	fields[7] = util.ToSQLdatetime(c.Not_valid_after_time)    
+	fields[8] = util.ToSQLbool(c.Is_valid)
+	fields[9] = util.ToSQLstring(c.OpenSSL_validation_error)
+	fields[10] = util.ToSQLbool(c.Is_ubuntu_valid)
+	fields[11] = util.ToSQLbool(c.Is_mozilla_valid)
+	fields[12] = util.ToSQLbool(c.Is_windows_valid)
+	fields[13] = util.ToSQLbool(c.Is_apple_valid)
+	fields[14] = util.ToSQLint(c.Depth)
+	fields[15] = util.ToSQLbool(c.Is_revoked)
+	fields[16] = util.ToSQLstring(c.Reason_revoked)
+    //  Derived fields extracted from certificate.
+    fields[17] = util.ToSQLstring(c.Issuer_name)
+    fields[18] = util.ToSQLstring(c.Subject_commonname)
+    fields[19] = util.ToSQLstring(c.Subject_organization)
+    fields[20] = util.ToSQLstring(c.Subject_organizationunit)
+    fields[21] = util.ToSQLstring(c.Subject_location)
+    fields[22] = util.ToSQLstring(c.Subject_countrycode)
+    fields[23] = util.ToSQLbool(strconv.FormatBool(c.Is_browser_valid))
+    fields[24] = util.ToSQLstring(strings.Join(c.Errors,","))
+    return util.ToSQLline(fields)    // return escaped fields for LOAD DATA INFILE
 }
 
 //
@@ -320,7 +357,7 @@ func Unpackcert(s []string, tldinfo util.DomainSuffixes) (Processedcert, error) 
 	}
 	//  Misc. fields to unpack
 	c.Valid = strings.HasPrefix("t", c.Is_valid) // discard if not valid
-	c.Browservalid = strings.HasPrefix("t", c.Is_mozilla_valid) ||
+	c.Is_browser_valid = strings.HasPrefix("t", c.Is_mozilla_valid) ||
 		strings.HasPrefix("t", c.Is_windows_valid) ||
 		strings.HasPrefix("t", c.Is_apple_valid) // valid in at least one big-name browser
 	c.CAsigned = !strings.HasPrefix("t", c.Is_self_signed)                  // signed by CA, not self

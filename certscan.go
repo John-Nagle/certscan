@@ -98,7 +98,7 @@ func keeptest(cfields certumich.Processedcert) (bool, error) {
 	keep := true // assume keep
 	//  Valid flags check
 	keep = keep && (keepopts.valid || cfields.Valid)               // discard if not valid
-	keep = keep && (keepopts.browservalid || cfields.Browservalid) // discard if not big-name browser valid
+	keep = keep && (keepopts.browservalid || cfields.Is_browser_valid) // discard if not big-name browser valid
 	keep = keep && (keepopts.casigned || cfields.CAsigned)         // discard if self-signed
 	//  Unpack subject info
 	domain := cfields.Subject_commonname // Common Name, i.e. main domain

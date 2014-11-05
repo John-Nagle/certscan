@@ -24,8 +24,8 @@ CREATE TABLE certs (
 	####Issuer                           string
 	Is_ca                            BOOL,
 	Is_self_signed                   BOOL,
-	Not_valid_before                 DATETIME,
-	Not_valid_after                  DATETIME,
+	Not_valid_before_time            DATETIME,
+	Not_valid_after_time             DATETIME,
 	Is_valid                         BOOL,
 	OpenSSL_validation_error         TEXT,
 	Is_ubuntu_valid                  BOOL,
