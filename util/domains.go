@@ -15,6 +15,7 @@ import "io"
 import "bufio"
 import "regexp"
 import "errors"
+import "code.google.com/p/go.net/idna"
 
 //
 //  Issubdomain  -- true if a is subdomain of b.
@@ -141,7 +142,11 @@ func (d *DomainSuffixes) Loadpublicsuffixlist(infile string) error {
 		} else { // non-comment
 			if inicann { // save ICANN names only
 				//  ***SHOULD VALIDATE DOMAIN SYNTAX HERE***
-				d.reversedsuffixes[Reversedomain(s)] = true // add to domain suffixes
+				domain, err := idna.ToUnicode(s)    // all Unicode, no punycode
+				if err != nil {
+				    return err
+				}
+				d.reversedsuffixes[Reversedomain(domain)] = true // add to domain suffixes
 			}
 		}
 	}

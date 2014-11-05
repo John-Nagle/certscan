@@ -17,6 +17,7 @@ import "errors"
 import "certscan/util"
 import "fmt"
 import "time"
+import "code.google.com/p/go.net/idna"
 
 //
 //  Constants
@@ -273,7 +274,10 @@ func (c *Processedcert) Unpacksubject(TLDinfo util.DomainSuffixes) error {
 	if err != nil {
 		return err // pass error upward
 	}
-	c.Subject_commonname = subjectparams["CN"]  // Common Name, i.e. main domain
+	c.Subject_commonname, err = idna.ToUnicode(subjectparams["CN"])  // Common Name, i.e. main domain
+	if err != nil {                                     // bad punycode
+		return err // pass error upward
+	}
 	c.Subject_organization = subjectparams["O"] // Organization
 	c.Subject_organizationunit = subjectparams["OU"]
 	c.Subject_location = subjectparams["L"]
@@ -288,7 +292,11 @@ func (c *Processedcert) Unpacksubject(TLDinfo util.DomainSuffixes) error {
 	//  Now have list of domains.  See which ones are unique second level domains
 	map2tld := make(map[string]bool) // second level domains, set
 	for i := range c.Domains {       // for all domains
-		_, a2nd, atld, aok := TLDinfo.Domainparts(c.Domains[i]) // break apart domain
+	    domain, err := idna.ToUnicode(c.Domains[i])
+	    if err != nil {
+		    return err // pass error upward
+	    }
+		_, a2nd, atld, aok := TLDinfo.Domainparts(domain) // break apart domain
 		if !aok {                                               // skip any non-domain junk
 			continue
 		}
