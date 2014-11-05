@@ -11,8 +11,26 @@ package main
 
 import "testing"
 
-////import "certscan/certumich"
+import "certscan/certumich"
 import "certscan/util"
+
+//
+//  Testdb  -- test database connection
+//
+func Testdb(t *testing.T) {
+    //  Test-only database parameters.
+    const user = "certscan"
+    const pass = "aaaa"
+    const database = "certscan"
+    var db certumich.Certdb       // working database
+    err := db.Connect(user, pass, database)    // open
+    if err != nil {
+        t.Logf(err.Error())
+        t.FailNow()
+        }
+    defer db.Disconnect()                        // close at exit
+    //  ***MORE***
+}
 
 //
 //  TestTLDinfo -- test domain info loading
