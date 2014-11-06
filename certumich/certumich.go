@@ -104,8 +104,7 @@ type Processedcert struct {
 //
 func (c *Processedcert) PackcertforSQL()(string) {
     const Fieldcount = 25
-    ////var fields [Fieldcount]string      // 
-    var fields []string = make([]string, Fieldcount, Fieldcount)
+    var fields [Fieldcount]string
     fields[0] = util.ToSQLint(c.Certificate_id)
 	fields[1] = util.ToSQLint(c.Serial_number)              
 	fields[2] = util.ToSQLint(c.Issuer_id)
@@ -132,9 +131,34 @@ func (c *Processedcert) PackcertforSQL()(string) {
     fields[22] = util.ToSQLstring(c.Subject_countrycode)
     fields[23] = util.ToSQLbool(strconv.FormatBool(c.Is_browser_valid))
     fields[24] = util.ToSQLstring(strings.Join(c.Errors,","))
-    return util.ToSQLline(fields)    // return escaped fields for LOAD DATA INFILE
+    return util.ToSQLline(fields[:])    // return escaped fields for LOAD DATA INFILE
 }
-
+//
+//  PackdomainsforSQL -- pack processed cert domain fields for SQL LOAD DATA INFILE use
+//
+func (c *Processedcert) PackdomainsforSQL()([]string) {
+    lines := make([]string,0)                                // group of lines
+    for i := range c.Domains2ld {                           // one line for each domain  
+        var fields [2]string
+        fields[0] = util.ToSQLint(c.Certificate_id)
+        fields[1] = util.ToSQLstring(c.Domains2ld[i])
+        lines = append(lines,util.ToSQLline(fields[:]))    // return escaped fields for LOAD DATA INFILE
+    }
+    return lines
+}
+//
+//  PackpoliciesforSQL -- pack processed cert domain fields for SQL LOAD DATA INFILE use
+//
+func (c *Processedcert) PackpoliciesforSQL()([]string) {
+    lines := make([]string,0)                                // group of lines
+    for i := range c.Policies {                           // one line for each domain  
+        var fields [2]string
+        fields[0] = util.ToSQLint(c.Certificate_id)
+        fields[1] = util.ToSQLstring(c.Policies[i])
+        lines = append(lines,util.ToSQLline(fields[:]))    // return escaped fields for LOAD DATA INFILE
+    }
+    return lines
+}
 //
 //  NameValue -- Name/value tuple, for general use
 //

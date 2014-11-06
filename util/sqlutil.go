@@ -106,7 +106,7 @@ type SQLdataloader struct {
 //
 func (d *SQLdataloader) doload() error {
 	const LOADPREFIX = "LOAD DATA LOCAL INFILE '"
-	const LOADSUFFIX = "' "
+	const LOADSUFFIX = "' " 
 	if d.fd == nil { // nothing to do
 		return nil
 	}
@@ -126,18 +126,29 @@ func (d *SQLdataloader) doload() error {
 	if err != nil {
 		return err
 	}
-	cmd := LOADPREFIX + filename + LOADSUFFIX + d.loadparams // LOAD DATA command
+	cmd := LOADPREFIX + filename + LOADSUFFIX + d.loadparams  + SQLFIELDSTERMINATED // LOAD DATA command
 	if d.verbose {
 		fmt.Printf("Loading %d records into SQL: %s\n", d.reccount, cmd) // debug
 	}
-	_, err = d.db.Exec(cmd) // do the LOAD DATA command
+	result, err := d.db.Exec(cmd) // do the LOAD DATA command
+	if d.verbose {
+	    if err != nil {
+	        fmt.Printf("Error loading data: %s\n", err.Error())
+	    } else {
+	        count, err2 := result.RowsAffected()
+	        if err2 != nil {
+	            fmt.Printf("SQL Error loading data: %s\n", err2.Error()) 
+	        }
+	        fmt.Printf("Loaded data, %d rows affected.\n", count)
+	    }
+	}
 	return (err)
 }
 
 //
 //  Open -- begin a loading operation
 //
-//  Write does all the work.
+//  Write does all the work.  This just saves params, so no error return
 //
 func (d *SQLdataloader) Open(loadparams string, db *sql.DB, recmax int32, verbose bool) {
 	if d.fd != nil {
@@ -155,6 +166,9 @@ func (d *SQLdataloader) Open(loadparams string, db *sql.DB, recmax int32, verbos
 //  Close  -- end a loading operation
 //
 func (d *SQLdataloader) Close() error {
+	if d.fd == nil { // already closed, nothing to do
+		return nil
+	}
 	err := d.doload() // do final load and cleanup if necessary
 	if err != nil {
 		return err
@@ -162,13 +176,16 @@ func (d *SQLdataloader) Close() error {
 	if d.verbose {
 		fmt.Printf("Successfully loaded %d records into database.\n", d.totalcount)
 	}
-	return (nil)
+	return nil
 }
 
 //
 //  Write -- write a string
 //
 func (d *SQLdataloader) Write(s string) error {
+	if len(s) == 0 { // don't try to write zero bytes
+		return nil
+	}
 	var err error               // needed on multiple paths
 	if d.reccount >= d.recmax { // if enough recs for a LOAD DATA
 		err = d.doload() // load the data into the database

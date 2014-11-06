@@ -15,8 +15,6 @@ package main
 import "encoding/csv"
 import "fmt"
 import "flag"
-
-////import "strings"
 import "os"
 import "io"
 import "bufio"
@@ -24,17 +22,25 @@ import "certscan/certumich"
 import "certscan/util"
 
 //
-//  keepoptions -- exclude record if lacks any of these properties.
+//  cmdoptions -- command line options
 //
-//  Default is exclude, options override.
-//
-type keepoptions struct {
+type cmdoptions struct {
+                        // exclude record if lacks any of these properties.
+                        // default is exclude, options override
 	altname      bool   // lacks alt domain names
 	org          bool   // lacks Organization (O) field
 	valid        bool   // not valid cert
 	browservalid bool   // not valid cert for any known browser cert chain
 	casigned     bool   // CA (not self-signed) cert
 	policy       string // Keep record only if policy matches ('DV', 'OV', 'EV', or an OID value)
+	                    // other options
+	outfilename  string // output CSV file if desired
+	infilenames  []string // names of input files
+	verbose      bool   // true if verbose for debug
+	                    // database credentials
+	user         string // database user
+	pass         string // database password
+	database     string // database name
 }
 
 //
@@ -49,8 +55,7 @@ type tallies struct {
 //
 //  Globals
 //
-var verbose bool = false        // true if verbose
-var keepopts keepoptions        // the keep/exclude options
+var cmdopts cmdoptions        // the keep/exclude options
 var tally tallies               // error counts
 var TLDinfo util.DomainSuffixes // top-level domain info
 var CAinfo util.CApolicyinfo    // policy info
@@ -62,22 +67,24 @@ var CAinfo util.CApolicyinfo    // policy info
 //
 //  Returns outfilename, []infilenames
 //
-func parseargs() (string, []string) {
+func parseargs(opts *cmdoptions) {
 	//  Command line options
-	flag.BoolVar(&verbose, "v", false, "Verbose mode")
-	flag.BoolVar(&keepopts.altname, "noaltname", false, "Keep record if no Alt Names")
-	flag.BoolVar(&keepopts.org, "noorg", false, "Keep record if no Organization")
-	flag.BoolVar(&keepopts.valid, "novalid", false, "Keep record if not valid cert")
-	flag.BoolVar(&keepopts.browservalid, "nobrowservalid", false, "Keep record if not valid per Mozilla root cert list")
-	flag.BoolVar(&keepopts.casigned, "nocasigned", false, "Keep record if not CA-signed (self-signed cert)")
-	flag.StringVar(&keepopts.policy, "policy", "", "Keep record if policy matches ('DV', 'OV', 'EV', or an OID value)")
-	var outfilename string
+	flag.BoolVar(&opts.verbose, "v", false, "Verbose mode")
+	flag.BoolVar(&opts.altname, "noaltname", false, "Keep record if no Alt Names")
+	flag.BoolVar(&opts.org, "noorg", false, "Keep record if no Organization")
+	flag.BoolVar(&opts.valid, "novalid", false, "Keep record if not valid cert")
+	flag.BoolVar(&opts.browservalid, "nobrowservalid", false, "Keep record if not valid per Mozilla root cert list")
+	flag.BoolVar(&opts.casigned, "nocasigned", false, "Keep record if not CA-signed (self-signed cert)")
+	flag.StringVar(&opts.policy, "policy", "", "Keep record if policy matches ('DV', 'OV', 'EV', or an OID value)")
 	infilenames := make([]string, 0)
-	flag.StringVar(&outfilename, "o", "", "Output file (csv format)")
+	flag.StringVar(&opts.outfilename, "o", "", "Output file (csv format)")
+	flag.StringVar(&opts.user, "user", "", "Database user name")
+	flag.StringVar(&opts.pass, "pass", "", "Database password")
+	flag.StringVar(&opts.database, "database", "", "Database name")
 	flag.Parse() // parse command line
-	if verbose { // dump args if verbose
+	if cmdopts.verbose { // dump args if verbose
 		fmt.Println("Verbose mode.")
-		fmt.Print("Output file: ", outfilename, "\n")
+		fmt.Print("Output file: ", cmdopts.outfilename, "\n")
 		fmt.Println("Input files: ")
 		for i := range flag.Args() {
 			fmt.Println(flag.Arg(i))
@@ -86,10 +93,10 @@ func parseargs() (string, []string) {
 	for i := range flag.Args() {
 		infilenames = append(infilenames, flag.Arg(i))
 	}
-	return outfilename, infilenames
+    opts.infilenames = infilenames
 }
 
-type rechandler func([]string, *csv.Writer) error
+type rechandler func([]string, *csv.Writer, *certumich.Certdb) error
 
 //
 //  keeptest -- do we want to keep this record?
@@ -97,36 +104,36 @@ type rechandler func([]string, *csv.Writer) error
 func keeptest(cfields certumich.Processedcert) (bool, error) {
 	keep := true // assume keep
 	//  Valid flags check
-	keep = keep && (keepopts.valid || cfields.Valid)               // discard if not valid
-	keep = keep && (keepopts.browservalid || cfields.Is_browser_valid) // discard if not big-name browser valid
-	keep = keep && (keepopts.casigned || cfields.CAsigned)         // discard if self-signed
+	keep = keep && (cmdopts.valid || cfields.Valid)               // discard if not valid
+	keep = keep && (cmdopts.browservalid || cfields.Is_browser_valid) // discard if not big-name browser valid
+	keep = keep && (cmdopts.casigned || cfields.CAsigned)         // discard if self-signed
 	//  Unpack subject info
 	domain := cfields.Subject_commonname // Common Name, i.e. main domain
 	//
 	//  CA Policy check
 	//
-	if keep && keepopts.policy != "" {
+	if keep && cmdopts.policy != "" {
 		find := false
 		for i := range cfields.Policies { // for all fields
 			field := cfields.Policies[i]
-			keep = keep || keepopts.policy == field   // if it matches an actual policy OID
+			keep = keep || cmdopts.policy == field   // if it matches an actual policy OID
 			policyitem, ok := CAinfo.Getpolicy(field) // look up policy item
 			if ok {
 				fmt.Printf("Domain '%s' OID %s (%s) from CA %s\n", domain, field, policyitem.Policy, policyitem.CAname) // ***TEMP***
-				find = find || policyitem.Policy == keepopts.policy                                                     // keep if policy matches policy param
+				find = find || policyitem.Policy == cmdopts.policy                                                     // keep if policy matches policy param
 			}
 		}
 		keep = keep && find // don't keep unless find
 	}
 	//  Alt names check
-	if keep && !keepopts.altname { // if requiring alt names
+	if keep && !cmdopts.altname { // if requiring alt names
 		if len(cfields.Domains2ld) > 1 { // if multiple domain cert
 			keep = true
 			fmt.Printf("Multiple-domain cert: '%s' vs '%s'\n", cfields.Domains2ld[0], cfields.Domains2ld[1]) // ***TEMP***
 		}
 	}
 	//  Has Organization field check
-	if keep && !keepopts.org {
+	if keep && !cmdopts.org {
 		foundorg := cfields.Subject_organization != "" // test for presence of org
 		keep = keep && foundorg                        // must have Organization field
 	}
@@ -136,7 +143,7 @@ func keeptest(cfields certumich.Processedcert) (bool, error) {
 //
 //  dorec -- handle an input line record, already parsed into fields
 //
-func dorec(fields []string, outf *csv.Writer) error {
+func dorec(fields []string, outf *csv.Writer, outdb *certumich.Certdb) error {
 	keep := false                                         // keep record for later processing?
 	tally.in++                                            // count in
 	var cfields certumich.Processedcert                   // cert in error format
@@ -155,14 +162,22 @@ func dorec(fields []string, outf *csv.Writer) error {
 			keep = true                               // force keep
 		}
 	}
-	if (outf != nil) && keep { // if output file
-		err := (*outf).Write(fields) // write output
-		tally.out++                  // count out
-		if err != nil {
-			panic(err) // fails
-		}
+	if keep {
+	    if outf != nil { // if output file
+		    err := (*outf).Write(fields) // write output
+		    tally.out++                  // count out
+		    if err != nil {
+			    panic(err) // fails
+		    }
+        }
+        if outdb != nil { // if output database
+            err := outdb.Insertcert(&cfields)
+		    if err != nil {
+			    panic(err) // fails
+		    }
+        }
 	}
-	if verbose {
+	if cmdopts.verbose {
 		cfields.Dump()
 	}
 	return nil
@@ -171,7 +186,7 @@ func dorec(fields []string, outf *csv.Writer) error {
 //
 //  readinputfile -- handle an input file
 //
-func readinputfile(infilename string, fn rechandler, outf *csv.Writer) (int, error) {
+func readinputfile(infilename string, fn rechandler, outf *csv.Writer, outdb *certumich.Certdb) (int, error) {
 	badlinecount := 0              // no bad lines yet
 	fi, err := os.Open(infilename) // open input file
 	if err != nil {
@@ -202,7 +217,7 @@ func readinputfile(infilename string, fn rechandler, outf *csv.Writer) (int, err
 			} // and skip
 			return badlinecount, err // I/O error
 		}
-		err = fn(fields, outf) // handle this record
+		err = fn(fields, outf, outdb) // handle this record
 		if err != nil {
 			panic(err)
 		}
@@ -211,7 +226,7 @@ func readinputfile(infilename string, fn rechandler, outf *csv.Writer) (int, err
 }
 
 //
-//  printstats-- print final statistics
+//  printstats -- print final statistics
 //
 func printstats(t tallies) {
 	fmt.Printf("Record counts:\n In:  %12d\n Out: %12d\n Err: %12d\n", t.in, t.out, t.errors)
@@ -241,11 +256,12 @@ func init() {
 //  Main program
 //
 func main() {
-	outfilename, infilenames := parseargs()
+	parseargs(&cmdopts)      // parse command line
 	var csvwp *csv.Writer = nil // output csv file, if any
-	if len(outfilename) > 0 {   // open output file
-		fmt.Println("Output file: ", outfilename)
-		fo, err := os.Create(outfilename) // create output file
+	var dbwriter *certumich.Certdb // output database, if any
+	if len(cmdopts.outfilename) > 0 {   // open output file
+		fmt.Println("Output file: ", cmdopts.outfilename)
+		fo, err := os.Create(cmdopts.outfilename) // create output file
 		if err != nil {
 			panic(err)
 		}
@@ -254,10 +270,23 @@ func main() {
 		csvwp = csv.NewWriter(w) // make a CSV writer
 		defer (*csvwp).Flush()   // flush at exit (before close)
 	}
+	//  Output database files if requested
+	if cmdopts.database != "" {
+	    if cmdopts.user == "" || cmdopts.pass == "" {
+	        panic("-database specified, but not -user or -pass for access.")    // fails
+	    }
+	    var db certumich.Certdb // our database object
+	    err := db.Connect(cmdopts.database, cmdopts.user, cmdopts.pass, cmdopts.verbose) 
+	    if err != nil {
+	        panic(err)
+	    }
+	    dbwriter = &db          // keeping a local beyond scope, OK in Go?
+	    ////defer db.Disconnect()   // emergency disconnect at exit
+	}
 	//  Process all the input files
-	for i := range infilenames {
-		println("Input file: ", infilenames[i])
-		badlinecount, err := readinputfile(infilenames[i], dorec, csvwp)
+	for i := range cmdopts.infilenames {
+		println("Input file: ", cmdopts.infilenames[i])
+		badlinecount, err := readinputfile(cmdopts.infilenames[i], dorec, csvwp, dbwriter)
 		if err != nil {
 			panic(err)
 		} // fail
@@ -265,6 +294,13 @@ func main() {
 			fmt.Println(badlinecount, "bad CSV lines in this file.") // report problems
 		}
 	}
+	if dbwriter != nil {
+	    err := dbwriter.Disconnect() // finish database update
+	    if err != nil {
+	        panic(err)
+	    }
+	    dbwriter = nil
+    }
 	//  Final statistics
 	printstats(tally)
 }
