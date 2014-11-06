@@ -130,7 +130,7 @@ func (d *SQLdataloader) doload() error {
 		return err
 	}
 	cmd := LOADPREFIX + filename + LOADSUFFIX + d.loadparams  + SQLFIELDSTERMINATED // LOAD DATA command
-	if d.verbose {
+	if true {
 		fmt.Printf("Loading %d records into SQL: %s\n", d.reccount, cmd) // debug
 	}
 	//  Filename must be registered with the driver for LOAD DATA LOCAL.

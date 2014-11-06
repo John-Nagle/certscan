@@ -9,13 +9,14 @@
 --  UTF-8 everywhere
 --
 USE sslcerts;
+DROP TABLE IF EXISTS certs, domains, policies;
 ALTER DATABASE sslcerts DEFAULT collate utf8_general_ci DEFAULT character set utf8;
 --
 --  certs - fields of interest from U. Mich. certificate dump
 --
 CREATE TABLE certs (
     --  Fields from U. Mich certificate dump
-	Certificate_id                   BIGINT PRIMARY KEY,
+	Certificate_id                   BIGINT PRIMARY KEY NOT NULL,
 	####Hex_encoded_SHA_1_fingerprint    string
 	Serial_number                    BIGINT,
 	Issuer_id                        BIGINT,
@@ -60,14 +61,16 @@ CREATE TABLE certs (
 	####Revoked_at                       string
 	Reason_revoked                   TEXT,
     --  Derived fields extracted from certificate.
-    Issuer_name                     VARCHAR(127),
-    Subject_commonname              VARCHAR(127),
+    Issuer_name                     VARCHAR(255),
+    Subject_commonname              VARCHAR(255),
     Subject_organization            TEXT,
     Subject_organizationunit        TEXT,
     Subject_location                TEXT,
     Subject_countrycode             TEXT(2),
     Is_browser_valid                BOOL,  -- at least one major browser vendor accepts this cert
-    Error_message                   TEXT
+    Error_message                   TEXT,
+    INDEX (Subject_commonname),
+    INDEX (Issuer_name)
 );
 
 --
@@ -77,13 +80,15 @@ CREATE TABLE certs (
 --  Subdomains are not stored here.
 --
 CREATE TABLE domains (
-    Certificate_id                  BIGINT,
-    Domain_2ld                      VARCHAR(127)   -- "2ld.tld", no subdomains
+    Certificate_id                  BIGINT NOT NULL,
+    Domain_2ld                      VARCHAR(255) NOT NULL,  -- "2ld.tld", no subdomains
+    UNIQUE INDEX (Certificate_id, Domain_2ld)
 );
 --
 --  policies --  Certificate policy OIDs associated with certificates above
 --
     CREATE TABLE policies (
-        Certificate_id                  BIGINT,
-        OID                             VARCHAR(20)
+        Certificate_id                  BIGINT NOT NULL,
+        OID                             VARCHAR(30) NOT NULL,
+        UNIQUE INDEX (Certificate_id, OID)
 );
