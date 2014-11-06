@@ -12,6 +12,9 @@ import "strconv"
 import "regexp"
 import "io/ioutil"
 import "database/sql"
+import (
+    "github.com/go-sql-driver/mysql"
+)
 
 //
 //  Conversions to the string format needed for MySQL LOAD DATA INFILE.
@@ -130,6 +133,8 @@ func (d *SQLdataloader) doload() error {
 	if d.verbose {
 		fmt.Printf("Loading %d records into SQL: %s\n", d.reccount, cmd) // debug
 	}
+	//  Filename must be registered with the driver for LOAD DATA LOCAL.
+	mysql.RegisterLocalFile(filename) // this allows LOAD DATA LOCAL to access the file
 	result, err := d.db.Exec(cmd) // do the LOAD DATA command
 	if d.verbose {
 	    if err != nil {
