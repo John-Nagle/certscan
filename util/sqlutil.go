@@ -57,12 +57,14 @@ func ToSQLstring(s string) string {
 //
 //  ToSQLbool -- bool as SQL string
 //
+//  MySQL wants 0 or 1 for TRUE or FALSE.
+//
 func ToSQLbool(s string) string {
 	s = strings.ToLower(strings.TrimSpace(s))
 	if strings.HasPrefix(s, "t") { // returns TRUE or FALSE in quotes
-		return "\"TRUE\""
+		return "\"1\""
 	}
-	return "\"FALSE\""
+	return "\"0\""
 }
 
 //
