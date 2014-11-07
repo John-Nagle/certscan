@@ -63,13 +63,14 @@ CREATE TABLE certs (
     --  Derived fields extracted from certificate.
     Issuer_name                     VARCHAR(255),
     Subject_commonname              VARCHAR(255),
+    Subject_commonname_2ld          VARCHAR(255),
     Subject_organization            TEXT,
     Subject_organizationunit        TEXT,
     Subject_location                TEXT,
     Subject_countrycode             TEXT(2),
     Is_browser_valid                BOOL,  -- at least one major browser vendor accepts this cert
     Error_message                   TEXT,
-    INDEX (Subject_commonname),
+    INDEX (Subject_commonname_2ld),
     INDEX (Issuer_name)
 );
 

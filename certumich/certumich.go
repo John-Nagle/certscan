@@ -84,6 +84,7 @@ type Processedcert struct {
 	Rawcert                            // fields of the raw cert
 	Issuer_name              string    // name of CA issuing cert
 	Subject_commonname       string    // CN main domain, if any
+	Subject_commonname_2ld   string    // CN main domain, 2LD part only
 	Subject_organization     string    // O organization, if any
 	Subject_organizationunit string    // OU organization unit, if any
 	Subject_location         string    // L location, if any
@@ -103,7 +104,7 @@ type Processedcert struct {
 //  PackCertforSQL -- pack processed cert into fields for SQL LOAD DATA INFILE use
 //
 func (c *Processedcert) PackcertforSQL()(string) {
-    const Fieldcount = 25
+    const Fieldcount = 26
     var fields [Fieldcount]string
     fields[0] = util.ToSQLint(c.Certificate_id)
 	fields[1] = util.ToSQLint(c.Serial_number)              
@@ -125,12 +126,13 @@ func (c *Processedcert) PackcertforSQL()(string) {
     //  Derived fields extracted from certificate.
     fields[17] = util.ToSQLstring(c.Issuer_name)
     fields[18] = util.ToSQLstring(c.Subject_commonname)
-    fields[19] = util.ToSQLstring(c.Subject_organization)
-    fields[20] = util.ToSQLstring(c.Subject_organizationunit)
-    fields[21] = util.ToSQLstring(c.Subject_location)
-    fields[22] = util.ToSQLstring(c.Subject_countrycode)
-    fields[23] = util.ToSQLbool(strconv.FormatBool(c.Is_browser_valid))
-    fields[24] = util.ToSQLstring(strings.Join(c.Errors,","))
+    fields[19] = util.ToSQLstring(c.Subject_commonname_2ld)
+    fields[20] = util.ToSQLstring(c.Subject_organization)
+    fields[21] = util.ToSQLstring(c.Subject_organizationunit)
+    fields[22] = util.ToSQLstring(c.Subject_location)
+    fields[23] = util.ToSQLstring(c.Subject_countrycode)
+    fields[24] = util.ToSQLbool(strconv.FormatBool(c.Is_browser_valid))
+    fields[25] = util.ToSQLstring(strings.Join(c.Errors,","))
     return util.ToSQLline(fields[:])    // return escaped fields for LOAD DATA INFILE
 }
 //
@@ -338,6 +340,10 @@ func (c *Processedcert) Unpacksubject(TLDinfo util.DomainSuffixes) error {
 	c.Subject_commonname, err = idna.ToUnicode(subjectparams["CN"])  // Common Name, i.e. main domain
 	if err != nil {                                     // bad punycode
 		return err // pass error upward
+	}
+	_, c2nd, ctld, cok := TLDinfo.Domainparts(c.Subject_commonname) // break apart CN domain field
+	if cok {                                            // if valid second level domain
+	    c.Subject_commonname_2ld = c2nd + "." + ctld   // get second level domain.tld only.
 	}
 	c.Subject_organization = subjectparams["O"] // Organization
 	c.Subject_organizationunit = subjectparams["OU"]
