@@ -9,7 +9,7 @@
 --  UTF-8 everywhere
 --
 USE sslcerts;
-DROP TABLE IF EXISTS certs, domains, policies;
+DROP TABLE IF EXISTS certs, domains, policies, capolicies;
 ALTER DATABASE sslcerts DEFAULT collate utf8_general_ci DEFAULT character set utf8;
 --
 --  certs - fields of interest from U. Mich. certificate dump
@@ -93,3 +93,12 @@ CREATE TABLE domains (
         OID                             VARCHAR(30) NOT NULL,
         UNIQUE INDEX (Certificate_id, OID)
 );
+--
+--  capolicies -- policy OIDs associated with CAs.
+--
+    CREATE TABLE capolicies (
+        OID                         VARCHAR(30) NOT NULL PRIMARY KEY,
+        Issuer_name                 VARCHAR(255),
+        certlevel ENUM('DV', 'OV', 'EV') NOT NULL
+);
+        

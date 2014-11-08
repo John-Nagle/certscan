@@ -13,7 +13,7 @@ import "regexp"
 import "io/ioutil"
 import "database/sql"
 import (
-    "github.com/go-sql-driver/mysql"
+	"github.com/go-sql-driver/mysql"
 )
 
 //
@@ -111,7 +111,7 @@ type SQLdataloader struct {
 //
 func (d *SQLdataloader) doload() error {
 	const LOADPREFIX = "LOAD DATA LOCAL INFILE '"
-	const LOADSUFFIX = "' " 
+	const LOADSUFFIX = "' "
 	if d.fd == nil { // nothing to do
 		return nil
 	}
@@ -131,23 +131,23 @@ func (d *SQLdataloader) doload() error {
 	if err != nil {
 		return err
 	}
-	cmd := LOADPREFIX + filename + LOADSUFFIX + d.loadparams  + SQLFIELDSTERMINATED // LOAD DATA command
+	cmd := LOADPREFIX + filename + LOADSUFFIX + d.loadparams + SQLFIELDSTERMINATED // LOAD DATA command
 	if true {
 		fmt.Printf("Loading %d records into SQL: %s\n", d.reccount, cmd) // debug
 	}
 	//  Filename must be registered with the driver for LOAD DATA LOCAL.
 	mysql.RegisterLocalFile(filename) // this allows LOAD DATA LOCAL to access the file
-	result, err := d.db.Exec(cmd) // do the LOAD DATA command
+	result, err := d.db.Exec(cmd)     // do the LOAD DATA command
 	if d.verbose {
-	    if err != nil {
-	        fmt.Printf("Error loading data: %s\n", err.Error())
-	    } else {
-	        count, err2 := result.RowsAffected()
-	        if err2 != nil {
-	            fmt.Printf("SQL Error loading data: %s\n", err2.Error()) 
-	        }
-	        fmt.Printf("Loaded data, %d rows affected.\n", count)
-	    }
+		if err != nil {
+			fmt.Printf("Error loading data: %s\n", err.Error())
+		} else {
+			count, err2 := result.RowsAffected()
+			if err2 != nil {
+				fmt.Printf("SQL Error loading data: %s\n", err2.Error())
+			}
+			fmt.Printf("Loaded data, %d rows affected.\n", count)
+		}
 	}
 	return (err)
 }
@@ -201,7 +201,7 @@ func (d *SQLdataloader) Write(s string) error {
 		}
 	} // do it
 	if d.fd == nil { // if need to start a file
-		d.fd, err = ioutil.TempFile("", "SQLBULKLOAD")
+		d.fd, err = ioutil.TempFile("", "SQLBULKLOAD-")
 		if err != nil {
 			return err
 		}

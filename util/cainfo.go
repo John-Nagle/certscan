@@ -18,6 +18,7 @@ import "strings"
 import "errors"
 import "regexp"
 import "encoding/csv"
+import "database/sql"
 
 //
 //  PolicyInfo -  for one policy OID
@@ -153,4 +154,54 @@ func (c *CApolicyinfo) Dump() {
 		fmt.Printf("  Policy: %s.  OID: '%s'  CA name: %s\n", v.Policy, k, v.CAname)
 	}
 	fmt.Println("")
+}
+
+//
+//  Database loading support
+//
+//
+//  Records per database load
+//
+const RECMAX = 10000 // after this many, load the database
+
+//
+//  Parameters for LOAD DATA INFILE LOCAL for the three tables
+//
+var OLOADPARAMS = "INTO TABLE capolicies"
+
+//
+//  InsertOIDs -- insert OID records into database
+//
+//  Input here is a map.
+//  There aren't really enough to require LOAD DATA INFILE, but the
+//  certs are done that way, so we do this that way.
+//
+func InsertOIDs(dbcon *sql.DB, c *CApolicyinfo, verbose bool) error {
+	if verbose {
+		fmt.Printf("Loading CA OID list for DV/OV/EV distinction.\n")
+	}
+	var oloader SQLdataloader // the data loader
+	oloader.Open(OLOADPARAMS, dbcon, RECMAX, verbose)
+	defer func() { // make sure everything closes, even if fail
+		_ = oloader.Close()
+	}()
+	for k, v := range c.policyOID { // range over the OIDs
+		var fields [3]string       // three fields
+		fields[0] = ToSQLstring(k) // OID
+		fields[1] = ToSQLstring(v.CAname)
+		fields[2] = v.Policy // enum - do we quote enums?
+		if verbose {
+			fmt.Printf(" Loaded OID %s from %s (%s)\n", fields[0], fields[1], fields[2])
+		}
+		err := oloader.Write(ToSQLline(fields[:])) // single line
+		if err != nil {
+			return err
+		}
+	}
+	err := oloader.Close()
+	if err != nil {
+		return err
+	}
+	//  Ought to commit here, but LOAD DATA INFILE implies commit
+	return nil
 }

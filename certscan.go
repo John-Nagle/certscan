@@ -20,6 +20,16 @@ import "io"
 import "bufio"
 import "certscan/certumich"
 import "certscan/util"
+import (
+	"database/sql"
+	_ "github.com/go-sql-driver/mysql"
+)
+
+//
+//  Constants
+//
+const TLDSUFFIXFILENAME = "/home/john/projects/gocode/src/certscan/data/effective_tld_names.dat" // overrideable
+const CAOIDFILENAMENAME = "/home/john/projects/gocode/src/certscan/data/catypetable.csv"         // overrideable
 
 //
 //  cmdoptions -- command line options
@@ -36,6 +46,8 @@ type cmdoptions struct {
 	// other options
 	outfilename string   // output CSV file if desired
 	infilenames []string // names of input files
+	tldfilename string   // top level domain file name
+	oidfilename string   // OID file name
 	verbose     bool     // true if verbose for debug
 	// database credentials
 	user     string // database user
@@ -81,6 +93,8 @@ func parseargs(opts *cmdoptions) {
 	flag.StringVar(&opts.user, "user", "", "Database user name")
 	flag.StringVar(&opts.pass, "pass", "", "Database password")
 	flag.StringVar(&opts.database, "database", "", "Database name")
+	flag.StringVar(&opts.tldfilename, "tldfile", TLDSUFFIXFILENAME, "File of top-level domain suffixes (csv format)")
+	flag.StringVar(&opts.oidfilename, "oidfile", CAOIDFILENAMENAME, "File of Policy OIDs by CA (csv format)")
 	flag.Parse()         // parse command line
 	if cmdopts.verbose { // dump args if verbose
 		fmt.Println("Verbose mode.")
@@ -239,33 +253,54 @@ func printstats(t tallies) {
 }
 
 //
-//  init -- misc. initialization
+//  miscinit -- misc. initialization
 //
-func init() {
+func miscinit(opts *cmdoptions) {
 	const domainsuffixfile = "/home/john/projects/gocode/src/certscan/data/effective_tld_names.dat" // should be overrideable
 	const caoidfile = "/home/john/projects/gocode/src/certscan/data/catypetable.csv"                // should be overrideable
-	err := TLDinfo.Loadpublicsuffixlist(domainsuffixfile)                                           // load domain info
+	err := TLDinfo.Loadpublicsuffixlist(opts.tldfilename)                                           // load domain info
 	if err != nil {
 		panic(err)
 	}
-	err = CAinfo.Loadoidinfo(caoidfile) // load CA policy info
+	err = CAinfo.Loadoidinfo(opts.oidfilename) // load CA policy info
 	if err != nil {
 		panic(err)
 	}
 }
 
 //
-//  Main program
+//  usage  -- print usage for bad inputs and exit.
 //
-func main() {
-	parseargs(&cmdopts)               // parse command line
+func usage(msg string) {
+	println(msg)
+	println()
+	println("Usage:  certscan [flags] inputcsvfile...")
+	flag.PrintDefaults() // print options
+	os.Exit(1)
+}
+
+//
+//  dooidupdate  --  put OID table into database
+//
+func dooidupdate(opts *cmdoptions, dbcon *sql.DB, oidinfo *util.CApolicyinfo) error {
+	if dbcon == nil { // no database
+		return nil
+	}
+	err := util.InsertOIDs(dbcon, oidinfo, opts.verbose)
+	return err
+}
+
+//
+//  doinputcertfiles  -- handle all input cert files, if any
+//
+func doinputcertfiles(opts *cmdoptions, dbcon *sql.DB) error {
 	var csvwp *csv.Writer = nil       // output csv file, if any
 	var dbwriter *certumich.Certdb    // output database, if any
-	if len(cmdopts.outfilename) > 0 { // open output file
+	if len(cmdopts.outfilename) > 0 { // open output CSV file
 		fmt.Println("Output file: ", cmdopts.outfilename)
 		fo, err := os.Create(cmdopts.outfilename) // create output file
 		if err != nil {
-			panic(err)
+			return (err)
 		}
 		defer fo.Close()         // close at exit (after flush)
 		w := bufio.NewWriter(fo) // make a write buffer
@@ -273,17 +308,14 @@ func main() {
 		defer (*csvwp).Flush()   // flush at exit (before close)
 	}
 	//  Output database files if requested
-	if cmdopts.database != "" {
-		if cmdopts.user == "" || cmdopts.pass == "" {
-			panic("-database specified, but not -user or -pass for access.") // fails
-		}
+	if dbcon != nil {
 		var db certumich.Certdb // our database object
-		err := db.Connect(cmdopts.database, cmdopts.user, cmdopts.pass, cmdopts.verbose)
+		err := db.Connect(dbcon, cmdopts.verbose)
 		if err != nil {
-			panic(err)
+			return (err)
 		}
-		dbwriter = &db // keeping a local beyond scope, OK in Go?
-		////defer db.Disconnect()   // emergency disconnect at exit
+		dbwriter = &db        // keeping a local beyond scope, OK in Go.
+		defer db.Disconnect() // emergency disconnect at exit
 	}
 	//  Process all the input files
 	for i := range cmdopts.infilenames {
@@ -299,9 +331,44 @@ func main() {
 	if dbwriter != nil {
 		err := dbwriter.Disconnect() // finish database update
 		if err != nil {
-			panic(err)
+			return err
 		}
 		dbwriter = nil
+	}
+	return nil // success
+}
+
+//
+//  Main program
+//
+func main() {
+	parseargs(&cmdopts) // parse command line
+	miscinit(&cmdopts)
+	var dbcon *sql.DB = nil // database connection if any
+	var err error
+	if cmdopts.database != "" {
+		if cmdopts.user == "" || cmdopts.pass == "" {
+			usage("-database specified, but not -user or -pass for access.") // fails
+		}
+		dbcon, err = sql.Open("mysql", cmdopts.user+":"+cmdopts.pass+"@/"+cmdopts.database) // connect
+		if err != nil {
+			panic(err)
+		}
+		if cmdopts.verbose {
+			fmt.Printf("Connected to database '%s'.\n", cmdopts.database)
+		}
+		defer dbcon.Close() // close database at end
+	}
+	err = dooidupdate(&cmdopts, dbcon, &CAinfo) // do OID update if possible
+	if err != nil {
+		panic(err)
+	}
+	//  Input certs as CSV file to database or output CSV file
+	if len(cmdopts.infilenames) > 0 { // if output files
+		err := doinputcertfiles(&cmdopts, dbcon) // do them
+		if err != nil {
+			panic(err)
+		}
 	}
 	//  Final statistics
 	printstats(tally)
