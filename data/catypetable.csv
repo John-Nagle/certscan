@@ -1,0 +1,63 @@
+"OIDs for different types of SSL/TLS certificates",,,,,
+,,,,,
+"Certificate authority ","DV OID","OV (or IV) OID","EV OID","CPS URL","Notes"
+,,,,,
+"Generic CA/Browser Forum","2.23.140.1.2.1","2.23.140.1.2.2 ","2.23.140.1.1","https://cabforum.org/wp-content/uploads/BRv1.2.3.pdf",
+,,,,,
+"Actalis S.p.A.","None – not listed","1.3.159.1.20.1","1.3.159.1.17.1","http://portal.actalis.it/cms/translations/en/actalis/Info/Manuali/CPS_SSLServer_CodeSigning_v2.2.5_EN.pdf",
+"ANF Autoridad de Certificación","None – not listed","1.3.6.1.4.1.18332.55.1.1.1.12 1.3.6.1.4.1.18332.55.1.1.1.22","1.3.6.1.4.1.18332.55.1.1.2.22","https://www.anf.es/es/pdf/PC_SSL_Sede_EV_EN.pdf","Unclear if OV OID implies validation."
+"AS Sertifitseerimiskeskus","?","?","?","https://sk.ee/upload/files/SK_CPS_en_v2_5.pdf","No OID information found"
+"Buypass AS","2.16.578.1.26.1.2.4","2.16.578.1.26.1.2.3","2.16.578.1.26.1.2.5","http://www.buypass.com/support/download-center/_attachment/27681?_ts=145bc19e990",
+"Camerfirma","?","?","?","http://docs.camerfirma.com/publico/DocumentosWeb/politicas/CPS_V_3_2_5_eng-GB-signed.pdf","No indication of custom OIDs, even for EV certs."
+"Certinomis","?","?","?","http://www.certinomis.com/publi/pc/DT-FL-1310-060-PC-WEB-SSL-1.2.pdf","No indication of custom OIDs."
+"certSIGN","?","?","?","http://www.certsign.ro/certsign_en/files/certSIGN_CPS_v1.7_en.pdf","No policy OIDs. CPS is from 2011."
+"Certum","ERROR","ERROR","ERROR","http://www.certum.eu/certum/cert,expertise_practice_statement.xml","Web site errors – docs returns 403, not found, empty doc."
+"Chunghwa Telecom Co., Ltd.","None","None","None","http://epki.com.tw/download/PublicCA_CPS_English.pdf","No policy OIDs. CPS is from 2008"
+"Comodo CA Ltd","1.3.6.1.4.1.6449.1.2.1.3.4
+1.3.6.1.4.1.6449.1.2.1.3.5
+1.3.6.1.4.1.6449.1.2.2.7
+Also CA/Browser Forum generic","Uses CA/Browser Forum generic","1.3.6.1.4.1.6449.1.2.1.5.1 
+Also CA/Browser Forum generic","https://www.comodo.com/repository/Comodo_CA_CPS_4.1.4_clean.pdf","Uses CA/Forum Generic values per email from robin@comodo.com"
+"D-TRUST GmbH","1.3.6.1.4.1.4788.2.200.1","None","1.3.6.1.4.1.4788.2.202.1","https://www.bundesdruckerei.de/sites/default/files/documents/2014/10/d-trust_root_pki_cp_v1_9_engl_.pdf","Has three classes of certs, but only two policy OIDs"
+"DigiCert, Inc.","2.16.840.1.114412.1.2","2.16.840.1.114412.1.1","2.16.840.1.114412.2","https://www.digicert.com/docs/cps/DigiCert_CPS_v4.07-Oct-7-2014.pdf","DigiCert also claims 2.23.140.1.1.X for EV. Strange"
+"Digidentity","None","1.3.6.1.4.1.34471.1.2.5.6","1.3.6.1.4.1.34471.1.2.1.7","https://www.digidentity.eu/static/en/voorwaarden/Certification%20Practice%20Statement%20L3.pdf",
+"Disig, a.s.","2.23.140.1.2.1","2.23.140.2.2","None","http://www.disig.eu/_pdf/cp-cadisig-eng.pdf","Unable to find any mention of EV certs. Possible translation problem."
+"E-TUGRA Inc.","2.16.792.3.0.4.1.1.2","2.16.792.3.0.4.1.1.3","2.16.792.3.0.4.1.1.4","http://www.e-tugra.com.tr/portals/6/Documents/E-Tugra_SUE_v3.1_0_EN.pdf",
+"Entrust","None","2.23.140.1.2.2 ","2.16.840.1.114028.10.1.2 ","http://www.entrust.net/CPS/pdf/SSL-CPS-English-20140304-Version-2-11.pdf","CPS not properly linked on web site – had to call for URL"
+"Firmaprofesional","1.3.6.1.4.1.13177.10.1.3.1",,"1.3.6.1.4.1.13177.10.1.3.10","https://www.firmaprofesional.com/images/pdfs/CPS/FP_CPS_6.1.pdf","Unsure of what guarantees are made for basic OID. Translation problem."
+"GlobalSign","Uses CA/Browser Forum generic","Uses CA/Browser Forum generic","1.3.6.1.4.1.4146.1.1","https://www.globalsign.com/repository/GlobalSign_CA_CPS_v7.8.pdf",
+"GoDaddy.com, LLC","2.16.840.1.114413.1.7.23.1","2.16.840.1.114413.1.7.23.2","2.16.840.1.114413.1.7.23.3","https://certs.godaddy.com/repository/certificate_practices/en/StarfieldCertificatePolicyandCertificationPracticeStatement.pdf",
+"Izenpe S.A.","?","?","?","http://www.izenpe.com/contenidos/informacion/dpc/eu_def/adjuntos/DOC_P_DPC_eu.pdf","Translation problem – no data yet. Not finding OID numbers."
+"Kamu Sertifikasyon Merkezi","?","?","?","http://www.kamusm.gov.tr","Translation problem – no data yet"
+"KPN Corporate Market BV","N/A","N/A","N/A","http://www.kpn.com","Does not appear to issue SSL certificates.  Uses Symantec. "
+"Logius PKIoverheid","None","2.16.528.1.1003.1.2.2.1","2.16.528.1.1003.1.2.7","https://www.logius.nl/languages/english/pkioverheid/",
+"Network Solutions, LLC","1.3.6.1.4.1.782.1.2.1.9.1","1.3.6.1.4.1.782.1.2.1.3.1","1.3.6.1.4.1.782.1.2.1.8.1","http://www.networksolutions.com/legal/SSL-legal-repository-cps.jsp",
+"Open Access Technology Intl.","None","None","None","http://www.oati.com/","Not an issuer of public web SSL certs. Serves power industry."
+"OpenTrust (formerly KEYNECTIS)","?","?","1.3.6.1.4.1.22234.2.
+5.2.3.1","http://www.opentrust.com/PDF/FR/PC/DSQ_PC_PC_AC_KEYNECTIS_SSL_1.2s.pdf","All certs may be at least OV-level. Need to read CPS more carefully."
+"Prvni certifikacni autorita, a.s.","1.3.6.1.4.1.23624.1.1.30.3.1","1.3.6.1.4.1.23624.1.1.60.3.1",,"http://www.ica.cz/Certification-policy","No EV option found."
+"QuoVadis Ltd.","1.3.6.1.4.1.8024.1.100","1.3.6.1.4.1.8024.1.200","1.3.6.1.4.1.8024.0.2.100.1.2","https://www.quovadisglobal.co.uk/~/media/Files/Repository/QV_RCA1_RCA3_CPCPS_V4_16.ashx",
+"SECOM Trust Systems CO., Ltd.","?","?","?","http://www.secomtrust.net","Translation problem – no data yet"
+"Shanghai Electronic Certification Authority Center Co. Ltd","?","?","?","www.sheca.com","Translation problem – no data yet"
+"Skaitmeninio sertifikavimo centras (SSC)",,,,"https://gdl.repository.ssc.lt/lt/talpykla/dokumentai/","Translation problem – no data yet. See table page 6."
+"StartCom Certification Authority","Uses CA/Browser Forum generic","Uses CA/Browser Forum generic ","1.3.6.1.4.1.23223.1.1.1","http://www.startssl.com/policy.pdf",
+"Swisscom (Switzerland) Ltd","None","None","None","http://www.swisscom.com","Does not appear to issue SSL certs."
+"SwissSign AG","?","?","?","https://www.swisssign.com/de/index.php?option=com_content&Itemid=100084&id=154",
+"Symantec Corporation","2.16.840.1.113733.1.7.23.1","2.16.840.1.113733.1.7.23.2
+2.16.840.1.113733.1.7.23.3","2.16.840.1.113733.1.7.23.6","http://www.symantec.com/content/en/us/about/media/repository/stn-cp.pdf","Class 3 non-EV is treated as OV."
+"TAIWAN-CA Inc.","?","?","?","https://www.twca.com.tw/picture/file/12261741-TWCA-CPS-EN.pdf","None of the CPS documents mention actual OID values."
+"Trend Micro Inc.","N/A","N/A","N/A","N/A","Sub-CA of Affirm Trust"
+"Trustis Limited","N/A","N/A","N/A","www.trustis.com","Does not appear to issue public-facing SSL certs."
+"Trustwave","N/A","N/A","N/A","http://www.trustwave.com","Does not appear to issue SSL certs."
+"TURKTRUST","None","2.16.792.3.0.3.1.1.2","2.16.792.3.0.3.1.1.5","http://www.turktrust.com.tr/files/bilgidepo/TURKTRUST_CPS_V-08_%5BEN%5D.pdf",
+"Visa","None","None","None","http://www.visa.com/pki/pdf/VisaPublicKeyInfrastructureCertificatePolicy.pdf",
+"Wells Fargo","None","None","None","https://www08.wellsfargomedia.com/downloads/pdf/com/cp/cp.pdf","Does not issue publicly visible SSL/TLS certs."
+"WoSign","None – not listed","None – not listed","1.3.6.1.4.1.36305.2","https://www.wosign.com/Policy/wosign-policy-1-2-4.pdf",
+,,,,,
+,,,,,
+"Non-CA/Brower Forum Members",,,,,
+,,,,,
+"Affirm Trust","None","None","1.3.6.1.4.1.34697.2.1
+1.3.6.1.4.1.34697.2.2
+1.3.6.1.4.1.34697.2.3
+1.3.6.1.4.1.34697.2.4","http://www.affirmtrust.com/images/affirmtrust_cps_v1.3_effective_1-3-2012.pdf",
