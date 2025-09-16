@@ -1,3 +1,8 @@
+Archived September 2025. 
+This worked with a project that is now defunct.
+
+-----------------------------------------------
+
 Certscan README
 
 
